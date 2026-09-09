@@ -49,10 +49,13 @@ jobs:
           echo "── 올라갈 파일 ──"
           find _site -mindepth 1 | sort
 
+      # ⚠️ 딱 한 번, 저장소 주인이 미리 해두셔야 하는 설정이 있습니다.
+      #    저장소 → Settings → Pages → Build and deployment
+      #    → Source 를 "GitHub Actions" 로 바꾸고 저장
+      #    (이 작업은 Pages 를 대신 켜 줄 권한이 없습니다. 안 켜져 있으면
+      #     여기서 "Get Pages site failed. Error: Not Found" 로 멈춥니다.)
       - name: 지면 설정 확인
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: 꾸러미 만들기
         uses: actions/upload-pages-artifact@v3
