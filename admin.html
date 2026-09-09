@@ -395,6 +395,8 @@
       h += fld("큰 글씨 문구", "title");
       h += fld("작은 딱지 — 한 줄에 하나씩", "points", { textarea: true, rows: 3 });
       h += fld("맨 아래 작은 글씨", "fine");
+      h += fld("배경 사진 주소 — 예: images/ads/cloud-banner.webp", "bgImage");
+      h += fld("배경 위에 깔 막 (예: rgba(245,242,234,.62))", "scrim");
       h += '<div class="row3">' + fld("바탕색", "bg") + fld("글자색", "fg") +
         fld("강조색", "accent") + "</div>";
       h += '<div class="row2">' + fld("칸 너비 (1~12단)", "span", { type: "number" }) +

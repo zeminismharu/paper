@@ -44,6 +44,8 @@ jobs:
           cp index.html admin.html paper.css paper.js seed.js _site/
           mkdir -p _site/data
           cp data/paper.json _site/data/
+          # 광고 배경 등 지면이 쓰는 그림
+          [ -d images ] && cp -r images _site/ || true
           # 밑줄로 시작하는 폴더를 GitHub 이 건드리지 않게 합니다
           touch _site/.nojekyll
           echo "── 올라갈 파일 ──"

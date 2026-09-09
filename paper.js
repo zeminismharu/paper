@@ -20,6 +20,16 @@ window.Paper = (function () {
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
+  /* 주소 안전 검사.
+     esc() 는 따옴표를 &#39; 로 바꾸지만 브라우저가 속성값을 풀 때 되돌아옵니다.
+     그래서 CSS url() 안에 들어가는 주소는 글자 escape 만으로 부족합니다.
+     http(s) 나 같은 폴더 안의 파일만 받고, 나머지(javascript: 등)는 버립니다. */
+  function safeUrl(u) {
+    u = String(u == null ? "" : u).trim();
+    if (!u) return "";
+    return /^(https?:\/\/|\/|\.\/|[\w.-]+\/)[^\s'"()<>\\]*$/i.test(u) ? u : "";
+  }
+
   /* 빈 줄로 나뉜 덩어리를 문단으로 */
   function paras(text) {
     return String(text || "")
@@ -150,7 +160,7 @@ window.Paper = (function () {
 
     /* ① 사진 광고 — 만들어 둔 이미지를 그대로 붙입니다 */
     if (b.image) {
-      return '<div class="adslot filled" style="' + mh + '"><img src="' + esc(b.image) +
+      return '<div class="adslot filled" style="' + mh + '"><img src="' + esc(safeUrl(b.image)) +
         '" alt="' + esc(b.label || "광고") + '"></div>';
     }
 
@@ -158,9 +168,17 @@ window.Paper = (function () {
        한글이 또렷하게 나오고 어느 크기에서도 깨지지 않습니다.
        (AI 로 만든 그림에 한글을 넣으면 글자가 뭉개집니다) */
     if (b.adStyle === "text") {
-      var bg = b.bg || "#0b3f8f", fg = b.fg || "#ffffff", ac = b.accent || "#ffd400";
+      var bgi = safeUrl(b.bgImage);
+      var fg = b.fg || (bgi ? "#16130f" : "#ffffff");
+      var ac = b.accent || (bgi ? "#9b1c1c" : "#ffd400");
       var pts = lines(b.points);
-      return '<div class="adbox" style="background:' + esc(bg) + ";color:" + esc(fg) + ";" + mh + '">' +
+      /* 배경 사진이 있으면 그 위에 옅은 막을 한 겹 깔아 글자가 묻히지 않게 합니다 */
+      var box = bgi
+        ? "background-image:linear-gradient(" + (b.scrim || "rgba(250,247,240,.26)") + "," +
+          (b.scrim || "rgba(250,247,240,.26)") + "),url('" + bgi +
+          "');background-size:cover;background-position:center 30%;"
+        : "background:" + esc(b.bg || "#0b3f8f") + ";";
+      return '<div class="adbox" style="' + box + "color:" + esc(fg) + ";" + mh + '">' +
         (b.eyebrow ? '<div class="adbox__eyebrow" style="background:' + esc(ac) +
           '">' + esc(b.eyebrow) + "</div>" : "") +
         '<div class="adbox__title">' + esc(b.title || "") + "</div>" +
@@ -244,7 +262,7 @@ window.Paper = (function () {
   }
 
   return {
-    esc: esc, paras: paras, lines: lines, clone: clone,
+    esc: esc, safeUrl: safeUrl, paras: paras, lines: lines, clone: clone,
     fmtDate: fmtDate, fmtDateShort: fmtDateShort,
     load: load, readDraft: readDraft, writeDraft: writeDraft, clearDraft: clearDraft,
     renderPage: renderPage, place: place,
