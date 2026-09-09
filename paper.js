@@ -119,9 +119,24 @@ window.Paper = (function () {
 
   function articleHTML(b) {
     var h = "";
-    if (b.kicker) h += '<div class="art__kicker">' + esc(b.kicker) + "</div>";
-    /* head = 지면에 싣는 짧은 제목. 없으면 원래 제목을 씁니다. */
-    h += '<h2 class="art__title">' + esc(b.head || b.title) + "</h2>";
+    /* 머리 — 눈썹·제목, 그리고 칼럼이면 필자 사진을 제목 옆에 놓습니다.
+       (.art 가 flex 라 float 은 먹지 않습니다. 가로로 나란히 놓아야 합니다.) */
+    var head = "";
+    if (b.kicker) head += '<div class="art__kicker">' + esc(b.kicker) + "</div>";
+    head += '<h2 class="art__title">' + esc(b.head || b.title) + "</h2>";
+
+    if (b.portrait) {
+      var pu = safeUrl(b.portrait.image);
+      h += '<div class="art__head">' +
+        '<div class="art__head-main">' + head + "</div>" +
+        '<div class="art__portrait">' +
+          (pu ? '<img src="' + esc(pu) + '" alt="">'
+              : '<div class="art__portrait-empty">필자<br>사진</div>') +
+          '<div class="art__portrait-name">' + esc(b.portrait.name || "") + "</div>" +
+        "</div></div>";
+    } else {
+      h += head;
+    }
 
     /* 부제 — 줄이 둘 이상일 때만 신문처럼 가운뎃점을 답니다.
        한 줄짜리는 그냥 한 문장이므로 점을 붙이면 어색합니다. */
@@ -210,8 +225,10 @@ window.Paper = (function () {
       '<div class="masthead__bar">' +
         "<span>" + esc(fmtDate(issue.date)) + "</span>" +
         "<span>" + esc(issue.volume || "") + "</span>" +
+        "<span>" + esc(b.founded || "") + "</span>" +
         "<span>" + esc(b.publisher || "") + "</span>" +
-      "</div>";
+      "</div>" +
+      (b.strip ? '<div class="masthead__strip">' + esc(b.strip) + "</div>" : "");
   }
 
   function pageheadHTML(b, issue, page) {
@@ -219,6 +236,63 @@ window.Paper = (function () {
       '<span class="pagehead__sec">' + esc(b.section || "") + "</span>" +
       '<span class="pagehead__date">' + esc(fmtDate(issue.date)) + " · " +
       esc(b.paper || "구름헤럴드") + "</span>";
+  }
+
+  /* 표 — 신문 통계표. 첫 칸은 왼쪽, 나머지 숫자 칸은 오른쪽으로 맞춥니다. */
+  function tableHTML(b) {
+    var head = b.head || [], rows = b.rows || [];
+    var cell = function (v, i, tag) {
+      return "<" + tag + (i === 0 ? "" : ' class="num"') + ">" +
+        esc(v) + "</" + tag + ">";
+    };
+    return (b.title ? '<div class="tbl__t">' + esc(b.title) + "</div>" : "") +
+      (b.note ? '<div class="tbl__note">' + esc(b.note) + "</div>" : "") +
+      "<table><thead><tr>" +
+        head.map(function (v, i) { return cell(v, i, "th"); }).join("") +
+      "</tr></thead><tbody>" +
+        rows.map(function (r) {
+          return "<tr>" + r.map(function (v, i) { return cell(v, i, "td"); }).join("") + "</tr>";
+        }).join("") +
+      "</tbody></table>" +
+      (b.source ? '<div class="tbl__src">' + esc(b.source) + "</div>" : "");
+  }
+
+  /* 그래프 — 가로 막대. 한글 항목 이름이 길어도 깨지지 않게 SVG 대신 글자로 그립니다.
+     기준선은 막대 칸 안쪽에 그립니다. 바깥에 두면 칸 너비 계산이 어긋나 선이 사라집니다. */
+  function chartHTML(b) {
+    var rows = b.rows || [];
+    var vals = rows.map(function (r) { return +r[1] || 0; });
+    var max = +b.max || Math.max.apply(null, vals.concat([1]));
+    var base = b.baseline == null ? null : +b.baseline;
+    var bstyle = base != null ? ";--b:" + (base / max * 100) + "%" : "";
+    return (b.title ? '<div class="tbl__t">' + esc(b.title) + "</div>" : "") +
+      (b.note ? '<div class="tbl__note">' + esc(b.note) + "</div>" : "") +
+      '<div class="chart' + (base != null ? " chart--base" : "") + '">' +
+        rows.map(function (r, i) {
+          var v = +r[1] || 0;
+          var lo = base != null && v < base;
+          return '<div class="chart__row">' +
+            '<span class="chart__lab">' + esc(r[0]) + "</span>" +
+            '<span class="chart__track" style="width:100%' + bstyle + '">' +
+              '<i class="' + (lo ? "lo" : "") + '" style="width:' +
+                Math.max(0, Math.min(100, v / max * 100)) + '%"></i>' +
+              (i === 0 && base != null
+                ? '<em class="chart__baselab">' + esc(b.baselineLabel || base) + "</em>" : "") +
+            "</span>" +
+            '<span class="chart__val">' + esc(r[2] != null ? r[2] : v) + "</span>" +
+            "</div>";
+        }).join("") +
+      "</div>" +
+      (b.source ? '<div class="tbl__src">' + esc(b.source) + "</div>" : "");
+  }
+
+  /* 인용 — 발언을 크게 뽑아 싣습니다. */
+  function quoteHTML(b) {
+    return '<div class="quote__mark">\u201C</div>' +
+      '<div class="quote__body">' +
+        paras(b.text).map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
+      "</div>" +
+      (b.who ? '<div class="quote__who">' + esc(b.who) + "</div>" : "");
   }
 
   function noteboxHTML(b) {
@@ -244,6 +318,9 @@ window.Paper = (function () {
         else if (b.type === "pagehead") { cls.push("pagehead"); html = pageheadHTML(b, issue, page); }
         else if (b.type === "ad")       { html = adHTML(b); }
         else if (b.type === "notebox")  { cls.push("notebox"); html = noteboxHTML(b); }
+        else if (b.type === "table")    { cls.push("tbl");     html = tableHTML(b); }
+        else if (b.type === "chart")    { cls.push("tbl");     html = chartHTML(b); }
+        else if (b.type === "quote")    { cls.push("quote");   html = quoteHTML(b); }
         else {
           cls.push("art", "art--" + (b.size || "minor"));
           if (b.boxed) cls.push("art--boxed");

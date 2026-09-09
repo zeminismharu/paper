@@ -160,6 +160,9 @@
       <button class="btn" data-add="article">+ 기사</button>
       <button class="btn" data-add="ad">+ 광고 자리</button>
       <button class="btn" data-add="notebox">+ 알림 상자</button>
+      <button class="btn" data-add="table">+ 표</button>
+      <button class="btn" data-add="chart">+ 그래프</button>
+      <button class="btn" data-add="quote">+ 인용</button>
       <button class="btn" data-add="masthead">+ 제호</button>
       <button class="btn" data-add="pagehead">+ 면 머리</button>
     </div>
@@ -261,7 +264,8 @@
 
   var TYPE_NAME = {
     article: "기사", ad: "광고 자리", notebox: "알림 상자",
-    masthead: "제호", pagehead: "면 머리"
+    masthead: "제호", pagehead: "면 머리",
+    table: "표", chart: "그래프", quote: "인용"
   };
 
   function renderBlocks() {
@@ -273,6 +277,8 @@
       var name = b.type === "article" ? (b.head || b.title || "(제목 없음)")
                : b.type === "ad" ? (b.label || "광고 자리")
                : b.type === "notebox" ? (b.title || "알림")
+               : (b.type === "table" || b.type === "chart") ? (b.title || "제목 없음")
+               : b.type === "quote" ? (b.text || "").slice(0, 24)
                : TYPE_NAME[b.type] || b.type;
       li.innerHTML =
         '<span class="k">' + Paper.esc(TYPE_NAME[b.type] || b.type) + "</span>" +
@@ -336,6 +342,10 @@
     opts = opts || {};
     var b = block();
     var v = b[key] == null ? "" : b[key];
+    /* 표·그래프의 머리글과 내용은 사람이 쓰기 쉽게 줄글로 보여 주고,
+       저장할 때 배열로 되돌립니다. */
+    if (key === "_head") v = (b.head || []).join(", ");
+    if (key === "_rows") v = (b.rows || []).map(function (r) { return r.join(", "); }).join("\n");
     /* 예/아니오 선택에 값을 맞춰 줍니다 */
     if (key === "boxed" || key === "verse" || key === "fill") v = b[key] ? "1" : "";
     var id = "in_" + key;
@@ -412,6 +422,28 @@
     } else if (b.type === "pagehead") {
       h += fld("분야 표시 (예: 정치 · 오피니언)", "section");
       h += '<div class="row2">' + fld("칸 너비", "span", { type: "number" }) + fld("칸 높이 px", "h", { type: "number" }) + "</div>";
+    } else if (b.type === "table" || b.type === "chart") {
+      var isChart = b.type === "chart";
+      h += '<p class="sub">' + (isChart
+        ? '한 줄에 <b>항목 이름 · 숫자</b> 를 쉼표로 적습니다. (예: <code>개발업, 45.8</code>)'
+        : '한 줄이 표의 한 줄입니다. 칸은 쉼표로 나눕니다.') + '</p>';
+      h += fld("제목", "title");
+      h += fld("설명 (제목 아래 작은 글씨)", "note", { textarea: true, rows: 2 });
+      if (!isChart) h += fld("머리글 — 쉼표로 나눕니다", "_head");
+      h += fld(isChart ? "항목 — 한 줄에 하나씩" : "내용 — 한 줄에 한 줄씩",
+               "_rows", { textarea: true, rows: 7 });
+      if (isChart) {
+        h += '<div class="row3">' + fld("최대값", "max", { type: "number" }) +
+          fld("기준선 값", "baseline", { type: "number" }) +
+          fld("기준선 이름", "baselineLabel") + "</div>";
+      }
+      h += fld("자료 출처", "source");
+      h += fld("칸 너비 (1~12단)", "span", { type: "number" });
+    } else if (b.type === "quote") {
+      h += '<p class="sub">기사에서 뽑아 크게 싣는 발언입니다.</p>';
+      h += fld("인용문 — 빈 줄로 문단을 나눕니다", "text", { textarea: true, rows: 4 });
+      h += fld("말한 사람 · 출처", "who");
+      h += fld("칸 너비 (1~12단)", "span", { type: "number" });
     } else if (b.type === "notebox") {
       h += fld("상자 제목", "title");
       h += fld("내용 — 빈 줄로 문단을 나눕니다", "body", { textarea: true, rows: 6 });
@@ -426,7 +458,19 @@
         var b = block(); if (!b) return;
         var v = el.value;
         if (el.type === "number") { v = v === "" ? undefined : +v; }
-        if (v === "" || v === undefined) delete b[key]; else b[key] = v;
+        if (key === "_head" || key === "_rows") {
+          var arr = String(el.value).split(/\r?\n/)
+            .map(function (t) { return t.trim(); }).filter(Boolean)
+            .map(function (t) {
+              return t.split(",").map(function (c) {
+                c = c.trim();
+                return (b.type === "chart" && /^-?\d+(\.\d+)?$/.test(c)) ? +c : c;
+              });
+            });
+          if (key === "_head") b.head = arr.length ? arr[0] : [];
+          else b.rows = arr;
+        }
+        else if (v === "" || v === undefined) delete b[key]; else b[key] = v;
         save(true);
         renderBlocks();
         renderPreview();
@@ -465,6 +509,19 @@
     };
     if (type === "notebox") return {
       type: "notebox", span: 4, h: 200, title: "알림", body: "알릴 내용을 씁니다."
+    };
+    if (type === "table") return {
+      type: "table", span: 4, title: "표 제목",
+      head: ["구분", "값"], rows: [["첫째 줄", "100"], ["둘째 줄", "80"]],
+      source: "자료 = "
+    };
+    if (type === "chart") return {
+      type: "chart", span: 6, title: "그래프 제목",
+      rows: [["첫째 항목", 80], ["둘째 항목", 45]],
+      source: "자료 = "
+    };
+    if (type === "quote") return {
+      type: "quote", span: 6, text: "여기에 뽑아 실을 발언을 씁니다.", who: "말한 사람"
     };
     if (type === "masthead") return {
       type: "masthead", span: 12, h: 152,
