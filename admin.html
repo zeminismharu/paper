@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>구름헤럴드 편집실</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Serif+KR:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="paper.css">
+<style>
+  /* ── 편집실 화면. 지면 자체의 모양은 paper.css 를 그대로 씁니다. ── */
+  body { background: #1b1917; color: #e9e5dc; }
+
+  .top {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.12);
+    background: #211e1b;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .top h1 { font-size: 16px; margin: 0 12px 0 0; letter-spacing: .04em; }
+  .top .sp { flex: 1; }
+  .msg { font-size: 12.5px; color: #9ad39a; min-height: 16px; }
+  .msg.warn { color: #e8b46a; }
+
+  .wrap {
+    display: grid;
+    grid-template-columns: 250px minmax(340px, 1fr) minmax(280px, 460px);
+    gap: 0;
+    align-items: start;
+    min-height: calc(100vh - 54px);
+  }
+  .col { padding: 14px; border-right: 1px solid rgba(255,255,255,.1); }
+  .col:last-child { border-right: 0; }
+
+  h2.sec {
+    font-size: 12px; letter-spacing: .18em; color: #9d968a;
+    margin: 0 0 8px; text-transform: uppercase;
+  }
+  .sub { font-size: 11.5px; color: #8d867a; line-height: 1.6; margin: 4px 0 10px; }
+
+  .list { list-style: none; margin: 0 0 10px; padding: 0; }
+  .list li {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 9px; border-radius: 7px; cursor: pointer;
+    border: 1px solid transparent; font-size: 13px;
+  }
+  .list li:hover { background: rgba(255,255,255,.06); }
+  .list li[aria-selected="true"] {
+    background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25);
+  }
+  .list li .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .list li .k { font-size: 10.5px; color: #9d968a; }
+  .mini { border: 0; background: none; color: #b7b0a3; cursor: pointer; font-size: 13px; padding: 2px 4px; }
+  .mini:hover { color: #fff; }
+
+  .field { margin-bottom: 11px; }
+  .field label { display: block; font-size: 11.5px; color: #a49d90; margin-bottom: 4px; }
+  .field input, .field textarea, .field select {
+    width: 100%; box-sizing: border-box;
+    background: #15130f; color: #ece8df;
+    border: 1px solid rgba(255,255,255,.16); border-radius: 7px;
+    padding: 8px 10px; font-size: 13.5px; font-family: inherit;
+    line-height: 1.6;
+  }
+  .field textarea { resize: vertical; }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    outline: none; border-color: #8fa9c9;
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+  .gauge {
+    font-size: 12px; border: 1px solid rgba(255,255,255,.16);
+    border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; line-height: 1.6;
+  }
+  .gauge.ok  { border-color: rgba(140,200,140,.5); color: #a9d5a9; }
+  .gauge.bad { border-color: rgba(230,160,90,.55); color: #e8b46a; }
+
+  /* 미리보기 — 지면을 그대로 줄여서 보여줍니다 */
+  .pv { position: sticky; top: 66px; }
+  .pvbox {
+    position: relative;
+    background: var(--paper);
+    box-shadow: 0 8px 26px rgba(0,0,0,.5);
+    overflow: hidden;
+  }
+  .pvinner {
+    width: 1000px; height: 1390px;
+    transform-origin: top left;
+    position: absolute; top: 0; left: 0;
+  }
+  .pvinner .page { position: absolute; inset: 0; }
+
+  .adder { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .adder .btn { padding: 6px 10px; font-size: 12px; }
+
+  @media (max-width: 1080px) {
+    .wrap { grid-template-columns: 1fr; }
+    .col { border-right: 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+    .pv { position: static; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>구름헤럴드 편집실</h1>
+  <button class="btn" id="bSave">저장</button>
+  <button class="btn" id="bPreview">지면으로 보기</button>
+  <button class="btn" id="bExport">내보내기 (paper.json)</button>
+  <button class="btn" id="bImport">불러오기</button>
+  <input type="file" id="fImport" accept="application/json" hidden>
+  <button class="btn btn--ghost" id="bReset">처음 자료로</button>
+  <span class="sp"></span>
+  <span class="msg" id="msg"></span>
+  <a class="btn btn--ghost" href="index.html">← 지면보기</a>
+</div>
+
+<div class="wrap">
+
+  <!-- ① 발행일 · 지면 -->
+  <div class="col">
+    <h2 class="sec">발행일</h2>
+    <ul class="list" id="issueList"></ul>
+    <div class="adder">
+      <button class="btn" id="bAddIssue">+ 발행일</button>
+      <button class="btn" id="bCopyIssue">이 호 복제</button>
+    </div>
+
+    <div class="field">
+      <label for="fDate">발행일</label>
+      <input type="date" id="fDate">
+    </div>
+    <div class="field">
+      <label for="fVolume">호수 (예: 제 12 호)</label>
+      <input type="text" id="fVolume">
+    </div>
+
+    <h2 class="sec" style="margin-top:18px">지면</h2>
+    <ul class="list" id="pageList"></ul>
+    <div class="adder">
+      <button class="btn" id="bAddPage">+ 지면</button>
+    </div>
+    <div class="field">
+      <label for="fPageLabel">면 이름 (A1, A2, B1 …)</label>
+      <input type="text" id="fPageLabel">
+    </div>
+  </div>
+
+  <!-- ② 지면 안의 칸 -->
+  <div class="col">
+    <h2 class="sec">지면 구성</h2>
+    <div class="gauge" id="gauge"></div>
+
+    <ul class="list" id="blockList"></ul>
+    <div class="adder">
+      <button class="btn" data-add="article">+ 기사</button>
+      <button class="btn" data-add="ad">+ 광고 자리</button>
+      <button class="btn" data-add="notebox">+ 알림 상자</button>
+      <button class="btn" data-add="masthead">+ 제호</button>
+      <button class="btn" data-add="pagehead">+ 면 머리</button>
+    </div>
+
+    <h2 class="sec" style="margin-top:18px">내용 편집</h2>
+    <div id="form"></div>
+  </div>
+
+  <!-- ③ 미리보기 -->
+  <div class="col">
+    <h2 class="sec">미리보기</h2>
+    <p class="sub">실제 지면과 같은 비율입니다. 아래로 넘치는 글은 지면에서 잘리고,
+      독자가 기사를 누르면 전문이 열립니다.</p>
+    <div class="pv">
+      <div class="pvbox" id="pvbox"><div class="pvinner" id="pvinner"></div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="seed.js"></script>
+<script src="paper.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var PAGE_W = 1000, PAGE_H = 1390;
+  var CONTENT_H = PAGE_H - 26 - 24;     // 지면 위아래 여백을 뺀 실제 높이
+
+  var data = null, iIssue = 0, iPage = 0, iBlock = 0;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var msg = $("msg");
+
+  function say(t, warn) {
+    msg.textContent = t;
+    msg.className = "msg" + (warn ? " warn" : "");
+    if (t) window.setTimeout(function () { if (msg.textContent === t) msg.textContent = ""; }, 4000);
+  }
+
+  function issue() { return data.issues[iIssue]; }
+  function page()  { return (issue().pages || [])[iPage]; }
+  function block() { return ((page() || {}).blocks || [])[iBlock]; }
+
+  /* ---------------- 저장 ---------------- */
+  function save(quiet) {
+    if (Paper.writeDraft(data)) { if (!quiet) say("저장했습니다. (이 브라우저에만 보관됩니다)"); }
+    else say("저장하지 못했습니다. 브라우저 저장 공간을 확인해 주세요.", true);
+  }
+
+  /* ---------------- 목록 그리기 ---------------- */
+  function renderIssues() {
+    var ul = $("issueList"); ul.innerHTML = "";
+    data.issues.forEach(function (iss, i) {
+      var li = document.createElement("li");
+      li.setAttribute("aria-selected", i === iIssue ? "true" : "false");
+      li.innerHTML = '<span class="t">' + Paper.esc(Paper.fmtDateShort(iss.date)) + "</span>" +
+        '<span class="k">' + (iss.pages || []).length + "면</span>";
+      var del = document.createElement("button");
+      del.className = "mini"; del.textContent = "×"; del.title = "이 발행일 삭제";
+      del.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (data.issues.length < 2) { say("발행일이 하나뿐이라 지울 수 없습니다.", true); return; }
+        if (!confirm(Paper.fmtDateShort(iss.date) + " 발행분을 지웁니다. 계속할까요?")) return;
+        data.issues.splice(i, 1);
+        iIssue = 0; iPage = 0; iBlock = 0;
+        save(true); renderAll();
+      });
+      li.appendChild(del);
+      li.addEventListener("click", function () { iIssue = i; iPage = 0; iBlock = 0; renderAll(); });
+      ul.appendChild(li);
+    });
+    $("fDate").value = issue().date || "";
+    $("fVolume").value = issue().volume || "";
+  }
+
+  function renderPages() {
+    var ul = $("pageList"); ul.innerHTML = "";
+    (issue().pages || []).forEach(function (p, i) {
+      var li = document.createElement("li");
+      li.setAttribute("aria-selected", i === iPage ? "true" : "false");
+      li.innerHTML = '<span class="t">' + Paper.esc(p.label || ("면 " + (i + 1))) + "</span>" +
+        '<span class="k">' + (p.blocks || []).length + "칸</span>";
+      var del = document.createElement("button");
+      del.className = "mini"; del.textContent = "×"; del.title = "이 면 삭제";
+      del.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if ((issue().pages || []).length < 2) { say("면이 하나뿐이라 지울 수 없습니다.", true); return; }
+        if (!confirm((p.label || "") + "면을 지웁니다. 계속할까요?")) return;
+        issue().pages.splice(i, 1); iPage = 0; iBlock = 0;
+        save(true); renderAll();
+      });
+      li.appendChild(del);
+      li.addEventListener("click", function () { iPage = i; iBlock = 0; renderAll(); });
+      ul.appendChild(li);
+    });
+    $("fPageLabel").value = (page() || {}).label || "";
+  }
+
+  var TYPE_NAME = {
+    article: "기사", ad: "광고 자리", notebox: "알림 상자",
+    masthead: "제호", pagehead: "면 머리"
+  };
+
+  function renderBlocks() {
+    var ul = $("blockList"); ul.innerHTML = "";
+    var blocks = (page() || {}).blocks || [];
+    blocks.forEach(function (b, i) {
+      var li = document.createElement("li");
+      li.setAttribute("aria-selected", i === iBlock ? "true" : "false");
+      var name = b.type === "article" ? (b.head || b.title || "(제목 없음)")
+               : b.type === "ad" ? (b.label || "광고 자리")
+               : b.type === "notebox" ? (b.title || "알림")
+               : TYPE_NAME[b.type] || b.type;
+      li.innerHTML =
+        '<span class="k">' + Paper.esc(TYPE_NAME[b.type] || b.type) + "</span>" +
+        '<span class="t">' + Paper.esc(name) + "</span>" +
+        '<span class="k">' + (b.span || 12) + "단 · " + (b.h || "auto") + "</span>";
+
+      var up = document.createElement("button");
+      up.className = "mini"; up.textContent = "▲"; up.title = "위로";
+      up.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (i === 0) return;
+        blocks.splice(i - 1, 0, blocks.splice(i, 1)[0]);
+        iBlock = i - 1; save(true); renderAll();
+      });
+      var dn = document.createElement("button");
+      dn.className = "mini"; dn.textContent = "▼"; dn.title = "아래로";
+      dn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (i >= blocks.length - 1) return;
+        blocks.splice(i + 1, 0, blocks.splice(i, 1)[0]);
+        iBlock = i + 1; save(true); renderAll();
+      });
+      var del = document.createElement("button");
+      del.className = "mini"; del.textContent = "×"; del.title = "지우기";
+      del.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (!confirm("이 칸을 지웁니다. 계속할까요?")) return;
+        blocks.splice(i, 1);
+        iBlock = Math.max(0, i - 1);
+        save(true); renderAll();
+      });
+      li.appendChild(up); li.appendChild(dn); li.appendChild(del);
+      li.addEventListener("click", function () { iBlock = i; renderAll(); });
+      ul.appendChild(li);
+    });
+
+    // 높이 합계 안내
+    var rows = Paper.place(blocks);
+    var used = 0, seen = {};
+    rows.forEach(function (it) {
+      if (!seen[it.row]) { seen[it.row] = 0; }
+      seen[it.row] = Math.max(seen[it.row], +it.b.h || 0);
+    });
+    Object.keys(seen).forEach(function (k) { used += seen[k]; });
+    var left = CONTENT_H - used;
+    var g = $("gauge");
+    g.className = "gauge " + (Math.abs(left) <= 12 ? "ok" : "bad");
+    g.innerHTML = "지면 한 장의 높이는 <b>" + CONTENT_H + "px</b> 입니다.<br>" +
+      "지금 배정된 높이 합계 <b>" + used + "px</b> — " +
+      (Math.abs(left) <= 12 ? "딱 맞습니다."
+        : left > 0 ? "<b>" + left + "px</b> 남습니다. 어느 칸의 높이를 늘려 주세요."
+                   : "<b>" + (-left) + "px</b> 넘칩니다. 아래쪽이 잘립니다.");
+  }
+
+  /* ---------------- 편집 폼 ---------------- */
+  function fld(label, key, opts) {
+    opts = opts || {};
+    var b = block();
+    var v = b[key] == null ? "" : b[key];
+    if (key === "boxed") v = b.boxed ? "1" : "";   /* 예/아니오 선택에 맞춰 줍니다 */
+    var id = "in_" + key;
+    var input;
+    if (opts.textarea) {
+      input = '<textarea id="' + id + '" rows="' + (opts.rows || 4) + '">' + Paper.esc(v) + "</textarea>";
+    } else if (opts.select) {
+      input = '<select id="' + id + '">' + opts.select.map(function (o) {
+        return '<option value="' + Paper.esc(o[0]) + '"' + (String(v) === String(o[0]) ? " selected" : "") +
+          ">" + Paper.esc(o[1]) + "</option>";
+      }).join("") + "</select>";
+    } else {
+      input = '<input id="' + id + '" type="' + (opts.type || "text") + '" value="' + Paper.esc(v) + '">';
+    }
+    return '<div class="field"><label for="' + id + '">' + Paper.esc(label) + "</label>" + input + "</div>";
+  }
+
+  function renderForm() {
+    var host = $("form");
+    var b = block();
+    if (!b) { host.innerHTML = '<p class="sub">왼쪽에서 칸을 고르거나 새로 추가하세요.</p>'; return; }
+
+    var h = "";
+    if (b.type === "article") {
+      h += fld("지면 제목 (신문에 큰 글씨로 실리는 제목)", "head");
+      h += fld("원래 제목 (‘전문 보기’에 쓰입니다. 비워 두면 지면 제목을 씁니다)", "title");
+      h += fld("눈썹 (분야 · 예: 정치, 사회, 칼럼)", "kicker");
+      h += fld("부제 — 한 줄에 하나씩", "subtitle", { textarea: true, rows: 3 });
+      h += fld("본문 — 빈 줄로 문단을 나눕니다", "body", { textarea: true, rows: 12 });
+      h += fld("기자 이름 (예: 홍길동 기자)", "byline");
+      h += '<div class="row2">' + fld("사진 주소(URL)", "image") + fld("사진 설명", "caption") + "</div>";
+      h += '<div class="row3">' +
+        fld("사진 높이 px", "imgh", { type: "number" }) +
+        fld("본문 단수", "cols", { type: "number" }) +
+        fld("제목 크기", "size", { select: [["lead","특대"],["major","크게"],["minor","보통"],["brief","작게"]] }) +
+        "</div>";
+      h += '<div class="row3">' +
+        fld("칸 너비 (1~12단)", "span", { type: "number" }) +
+        fld("칸 높이 px", "h", { type: "number" }) +
+        fld("상자 두르기", "boxed", { select: [["", "아니오"], ["1", "예"]] }) +
+        "</div>";
+    } else if (b.type === "ad") {
+      h += '<p class="sub">광고 자리는 <b>비워 둔 칸</b>입니다. 사진 주소를 넣으면 그 자리에 광고가 들어가고,'
+        + ' 비워 두면 점선 여백으로 남습니다.</p>';
+      h += fld("칸 안에 적을 문구", "label");
+      h += fld("크기 안내 (작게 적히는 줄)", "note");
+      h += fld("광고 이미지 주소(URL) — 채울 때만", "image");
+      h += '<div class="row2">' + fld("칸 너비 (1~12단)", "span", { type: "number" }) +
+        fld("칸 높이 px", "h", { type: "number" }) + "</div>";
+    } else if (b.type === "masthead") {
+      h += fld("제호", "title");
+      h += fld("표어", "tagline");
+      h += fld("오른쪽 아래 표기 (주소 등)", "publisher");
+      h += '<div class="row2">' + fld("제호 왼쪽 광고 문구", "adLeft") + fld("제호 오른쪽 광고 문구", "adRight") + "</div>";
+      h += '<div class="row2">' + fld("왼쪽 광고 이미지 URL", "adLeftImage") + fld("오른쪽 광고 이미지 URL", "adRightImage") + "</div>";
+      h += '<div class="row2">' + fld("칸 너비", "span", { type: "number" }) + fld("칸 높이 px", "h", { type: "number" }) + "</div>";
+    } else if (b.type === "pagehead") {
+      h += fld("분야 표시 (예: 정치 · 오피니언)", "section");
+      h += '<div class="row2">' + fld("칸 너비", "span", { type: "number" }) + fld("칸 높이 px", "h", { type: "number" }) + "</div>";
+    } else if (b.type === "notebox") {
+      h += fld("상자 제목", "title");
+      h += fld("내용 — 빈 줄로 문단을 나눕니다", "body", { textarea: true, rows: 6 });
+      h += '<div class="row2">' + fld("칸 너비", "span", { type: "number" }) + fld("칸 높이 px", "h", { type: "number" }) + "</div>";
+    }
+    host.innerHTML = h;
+
+    // 값이 바뀌면 바로 반영합니다
+    host.querySelectorAll("input, textarea, select").forEach(function (el) {
+      var key = el.id.slice(3);
+      el.addEventListener("input", function () {
+        var b = block(); if (!b) return;
+        var v = el.value;
+        if (el.type === "number") { v = v === "" ? undefined : +v; }
+        if (v === "" || v === undefined) delete b[key]; else b[key] = v;
+        save(true);
+        renderBlocks();
+        renderPreview();
+      });
+    });
+  }
+
+  /* ---------------- 미리보기 ---------------- */
+  function renderPreview() {
+    var box = $("pvbox"), inner = $("pvinner");
+    var p = page();
+    if (!p) { inner.innerHTML = ""; return; }
+    inner.innerHTML = Paper.renderPage(issue(), p);
+    var w = box.parentElement.clientWidth;
+    var k = w / PAGE_W;
+    inner.style.transform = "scale(" + k + ")";
+    box.style.width = w + "px";
+    box.style.height = (PAGE_H * k) + "px";
+  }
+
+  function renderAll() {
+    renderIssues(); renderPages(); renderBlocks(); renderForm(); renderPreview();
+  }
+
+  /* ---------------- 새로 만들기 ---------------- */
+  function newBlock(type) {
+    if (type === "article") return {
+      type: "article", span: 4, h: 400, cols: 1, size: "minor",
+      kicker: "사회", head: "새 기사 제목", title: "", subtitle: "",
+      body: "여기에 본문을 씁니다.\n\n빈 줄을 넣으면 문단이 나뉩니다.", byline: "기자 이름 기자"
+    };
+    if (type === "ad") return {
+      type: "ad", span: 12, h: 250,
+      label: "광고 자리", note: "여백으로 비워 둔 칸입니다"
+    };
+    if (type === "notebox") return {
+      type: "notebox", span: 4, h: 200, title: "알림", body: "알릴 내용을 씁니다."
+    };
+    if (type === "masthead") return {
+      type: "masthead", span: 12, h: 152,
+      title: (data.meta && data.meta.name) || "구름헤럴드",
+      tagline: (data.meta && data.meta.tagline) || "",
+      publisher: "gureumherald.com",
+      adLeft: "제호 왼쪽 광고 자리", adRight: "제호 오른쪽 광고 자리"
+    };
+    if (type === "pagehead") return {
+      type: "pagehead", span: 12, h: 46, section: "분야", paper: "구름헤럴드"
+    };
+    return { type: "article", span: 12, h: 300 };
+  }
+
+  document.querySelectorAll("[data-add]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var p = page(); if (!p) return;
+      p.blocks = p.blocks || [];
+      p.blocks.push(newBlock(btn.dataset.add));
+      iBlock = p.blocks.length - 1;
+      save(true); renderAll();
+    });
+  });
+
+  $("bAddIssue").addEventListener("click", function () {
+    var d = new Date();
+    var iso = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+      "-" + String(d.getDate()).padStart(2, "0");
+    data.issues.unshift({
+      date: iso, volume: "",
+      pages: [
+        { label: "A1", blocks: [newBlock("masthead"), newBlock("ad")] },
+        { label: "A2", blocks: [newBlock("pagehead"), newBlock("ad")] }
+      ]
+    });
+    iIssue = 0; iPage = 0; iBlock = 0;
+    save(true); renderAll();
+    say("새 발행일을 만들었습니다. 날짜를 정해 주세요.");
+  });
+
+  $("bCopyIssue").addEventListener("click", function () {
+    var copy = Paper.clone(issue());
+    copy.date = "";
+    data.issues.unshift(copy);
+    iIssue = 0; iPage = 0; iBlock = 0;
+    save(true); renderAll();
+    say("이 호를 복제했습니다. 날짜를 새로 정해 주세요.", true);
+  });
+
+  $("bAddPage").addEventListener("click", function () {
+    var n = (issue().pages || []).length + 1;
+    issue().pages.push({ label: "A" + n, blocks: [newBlock("pagehead"), newBlock("ad")] });
+    iPage = issue().pages.length - 1; iBlock = 0;
+    save(true); renderAll();
+  });
+
+  $("fDate").addEventListener("input", function () {
+    issue().date = this.value; save(true); renderIssues(); renderPreview();
+  });
+  $("fVolume").addEventListener("input", function () {
+    issue().volume = this.value; save(true); renderPreview();
+  });
+  $("fPageLabel").addEventListener("input", function () {
+    page().label = this.value; save(true); renderPages(); renderPreview();
+  });
+
+  /* ---------------- 저장 · 내보내기 ---------------- */
+  $("bSave").addEventListener("click", function () { save(); });
+
+  $("bPreview").addEventListener("click", function () {
+    save(true);
+    window.open("index.html?draft=1", "_blank");
+  });
+
+  $("bExport").addEventListener("click", function () {
+    save(true);
+    var blob = new Blob([JSON.stringify(data, null, 1)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "paper.json";
+    document.body.appendChild(a); a.click();
+    window.setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    say("paper.json 을 내려받았습니다. newspaper/data/ 폴더에 넣으면 모두에게 보입니다.");
+  });
+
+  $("bImport").addEventListener("click", function () { $("fImport").click(); });
+  $("fImport").addEventListener("change", function () {
+    var f = this.files && this.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var d = JSON.parse(r.result);
+        if (!d || !Array.isArray(d.issues)) throw new Error("모양이 다릅니다");
+        data = d; iIssue = 0; iPage = 0; iBlock = 0;
+        save(true); renderAll();
+        say("불러왔습니다.");
+      } catch (e) { say("읽지 못했습니다 — " + e.message, true); }
+    };
+    r.readAsText(f);
+    this.value = "";
+  });
+
+  $("bReset").addEventListener("click", function () {
+    if (!confirm("편집 중인 내용을 모두 버리고 처음 자료로 돌아갑니다. 계속할까요?")) return;
+    Paper.clearDraft();
+    data = Paper.clone(window.PAPER_SEED);
+    iIssue = 0; iPage = 0; iBlock = 0;
+    save(true); renderAll();
+    say("처음 자료로 되돌렸습니다.");
+  });
+
+  window.addEventListener("resize", renderPreview);
+
+  /* ---------------- 시작 ---------------- */
+  var draft = Paper.readDraft();
+  if (draft) {
+    data = draft;
+    renderAll();
+    say("편집 중이던 내용을 이어서 엽니다.");
+  } else {
+    Paper.load().then(function (d) {
+      data = d;
+      data.issues.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+      renderAll();
+    });
+  }
+})();
+</script>
+</body>
+</html>

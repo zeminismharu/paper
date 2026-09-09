@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>구름헤럴드 지면보기</title>
+<meta name="description" content="구름헤럴드 지면보기 — 날짜별로 신문 지면을 넘겨 봅니다.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Serif+KR:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="paper.css">
+</head>
+<body>
+
+<div class="desk">
+
+  <div class="stage" id="stage">
+    <div class="deck" id="deck">
+      <!-- 종이는 자바스크립트가 넣습니다 -->
+      <div class="grab left"  id="grabL" aria-label="앞 면으로"></div>
+      <div class="grab right" id="grabR" aria-label="다음 면으로"></div>
+    </div>
+  </div>
+
+  <div class="bar">
+    <div class="dates">
+      <button class="nav" id="prevDate" title="이전 발행일">◀</button>
+      <select id="dateSel" aria-label="발행일 선택"></select>
+      <button class="nav" id="nextDate" title="다음 발행일">▶</button>
+    </div>
+
+    <div class="pagerdots" id="pager"></div>
+
+    <button class="btn" id="btnPrev">◀ 앞 면</button>
+    <button class="btn" id="btnNext">다음 면 ▶</button>
+    <a class="btn btn--ghost" href="admin.html">편집</a>
+
+    <div class="hint" id="hint">종이의 오른쪽 끝을 잡아 끌면 넘어갑니다 · 기사를 누르면 전문이 열립니다 · ← → 키</div>
+  </div>
+
+</div>
+
+<!-- 기사 전문 -->
+<div class="reader" id="reader" hidden>
+  <div class="reader__box" id="readerBox"></div>
+</div>
+
+<script src="seed.js"></script>
+<script src="paper.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var PAGE_W = 1000, PAGE_H = 1390;
+  var stage = document.getElementById("stage");
+  var deck  = document.getElementById("deck");
+  var grabL = document.getElementById("grabL");
+  var grabR = document.getElementById("grabR");
+  var dateSel = document.getElementById("dateSel");
+  var pager = document.getElementById("pager");
+  var reader = document.getElementById("reader");
+  var readerBox = document.getElementById("readerBox");
+
+  var data = null;      // 전체 자료
+  var issue = null;     // 지금 보는 호(號)
+  var sheets = [];      // 종이 DOM
+  var cur = 0;          // 지금 펼쳐진 면 번호 (0부터)
+  var busy = false;
+
+  var isDraft = /[?&]draft=1/.test(location.search);
+
+  /* ---------------- 배율 ---------------- */
+  function fit() {
+    var w = stage.clientWidth - 28;
+    var h = stage.clientHeight - 28;
+    var k = Math.min(w / PAGE_W, h / PAGE_H);
+    k = Math.max(0.16, Math.min(k, 1.15));
+    deck.style.width  = (PAGE_W * k) + "px";
+    deck.style.height = (PAGE_H * k) + "px";
+    // 종이 자체를 축소합니다. (rotateY 는 축이 왼쪽 모서리라 축소와 같이 걸어도 됩니다)
+    sheets.forEach(function (s) { s.dataset.k = k; });
+    applyAll();
+  }
+
+  /* 종이의 실제 변형값 = 축소 × 넘김각도 */
+  function applyTransform(sheet, deg) {
+    var k = +sheet.dataset.k || 1;
+    sheet.style.transform = "scale(" + k + ") rotateY(" + deg + "deg)";
+  }
+  function applyAll() {
+    sheets.forEach(function (s, i) {
+      applyTransform(s, i < cur ? -180 : 0);
+      s.style.zIndex = i < cur ? i : (sheets.length - i);
+      s.querySelector(".shade").style.opacity = 0;
+    });
+  }
+
+  /* ---------------- 지면 만들기 ---------------- */
+  function buildIssue(iss) {
+    issue = iss;
+    sheets.forEach(function (s) { s.remove(); });
+    sheets = [];
+    cur = 0;
+
+    (iss.pages || []).forEach(function (page, i) {
+      var sheet = document.createElement("div");
+      sheet.className = "sheet";
+      sheet.innerHTML =
+        '<div class="face front">' + Paper.renderPage(iss, page) + '<div class="shade"></div></div>' +
+        '<div class="face back"></div>';
+      sheet.dataset.i = i;
+      deck.insertBefore(sheet, grabL);
+      sheets.push(sheet);
+    });
+
+    buildPager();
+    fit();
+    updateNav();
+  }
+
+  function buildPager() {
+    pager.innerHTML = "";
+    (issue.pages || []).forEach(function (p, i) {
+      var b = document.createElement("button");
+      b.textContent = p.label || (i + 1);
+      b.addEventListener("click", function () { goTo(i); });
+      pager.appendChild(b);
+    });
+  }
+
+  function updateNav() {
+    Array.prototype.forEach.call(pager.children, function (b, i) {
+      b.setAttribute("aria-current", i === cur ? "true" : "false");
+    });
+    document.getElementById("btnPrev").disabled = cur === 0;
+    document.getElementById("btnNext").disabled = cur >= sheets.length - 1;
+    grabR.classList.toggle("off", cur >= sheets.length - 1);
+    grabL.classList.toggle("off", cur === 0);
+  }
+
+  /* ---------------- 넘기기 ---------------- */
+  function goTo(target) {
+    if (busy || target === cur || target < 0 || target >= sheets.length) return;
+    var forward = target > cur;
+    busy = true;
+
+    // 한 장씩만 부드럽게 넘깁니다 (여러 장이면 즉시 이동 후 마지막 한 장만 연출)
+    if (Math.abs(target - cur) > 1) {
+      cur = forward ? target - 1 : target + 1;
+      applyAll();
+    }
+
+    var idx = forward ? cur : cur - 1;
+    var sheet = sheets[idx];
+    var shade = sheet.querySelector(".shade");
+
+    sheet.style.zIndex = 100;
+    sheet.classList.add("is-animating");
+    shade.style.transition = "opacity .82s";
+    applyTransform(sheet, forward ? -180 : 0);
+    shade.style.opacity = forward ? 0.5 : 0;
+
+    window.setTimeout(function () {
+      sheet.classList.remove("is-animating");
+      shade.style.transition = "";
+      cur = target;
+      applyAll();
+      updateNav();
+      busy = false;
+    }, 840);
+  }
+
+  function next() { goTo(cur + 1); }
+  function prev() { goTo(cur - 1); }
+
+  /* 끌어서 넘기기 */
+  function makeDraggable(handle, dir) {
+    var active = null, startX = 0, moved = 0, sheet = null, shade = null;
+
+    handle.addEventListener("pointerdown", function (e) {
+      if (busy) return;
+      moved = 0;
+      var idx = dir === 1 ? cur : cur - 1;
+      if (idx < 0 || idx >= sheets.length) return;
+      if (dir === 1 && cur >= sheets.length - 1) return;
+      if (dir === -1 && cur === 0) return;
+
+      active = e.pointerId;
+      startX = e.clientX;
+      sheet = sheets[idx];
+      shade = sheet.querySelector(".shade");
+      sheet.style.zIndex = 100;
+      sheet.classList.remove("is-animating");
+      handle.setPointerCapture(e.pointerId);
+    });
+
+    handle.addEventListener("pointermove", function (e) {
+      if (active !== e.pointerId || !sheet) return;
+      var w = deck.clientWidth || 1;
+      var dx = e.clientX - startX;
+      moved = Math.max(moved, Math.abs(dx));
+      var deg = dir === 1
+        ? Math.max(-180, Math.min(0, (dx / w) * 180))
+        : Math.max(-180, Math.min(0, -180 + (dx / w) * 180));
+      applyTransform(sheet, deg);
+      shade.style.opacity = Math.min(0.5, Math.abs(deg) / 180 * 0.5);
+      e.preventDefault();
+    });
+
+    function finish(e) {
+      if (active !== e.pointerId) return;
+      active = null;
+      if (!sheet) return;
+
+      var w = deck.clientWidth || 1;
+      var dx = e.clientX - startX;
+      var s = sheet, sh = shade;
+      sheet = null; shade = null;
+
+      // 거의 안 움직였으면 "그냥 눌렀다"로 봅니다 → 한 장 넘김
+      if (moved < 6) {
+        applyTransform(s, dir === 1 ? 0 : -180);
+        sh.style.opacity = dir === 1 ? 0 : 0.5;
+        if (dir === 1) next(); else prev();
+        return;
+      }
+
+      var passed = dir === 1 ? (dx < -w * 0.22) : (dx > w * 0.22);
+      var settle = dir === 1 ? (passed ? -180 : 0) : (passed ? 0 : -180);
+
+      s.classList.add("is-animating");
+      sh.style.transition = "opacity .5s";
+      applyTransform(s, settle);
+      sh.style.opacity = settle === 0 ? 0 : 0.5;
+
+      busy = true;
+      window.setTimeout(function () {
+        s.classList.remove("is-animating");
+        sh.style.transition = "";
+        if (passed) cur = dir === 1 ? cur + 1 : cur - 1;
+        applyAll();
+        updateNav();
+        busy = false;
+      }, 520);
+    }
+    handle.addEventListener("pointerup", finish);
+    handle.addEventListener("pointercancel", finish);
+  }
+
+  /* ---------------- 기사 전문 ---------------- */
+  function openReader(pageIdx, blockIdx) {
+    var page = issue.pages[pageIdx];
+    var b = (page.blocks || [])[blockIdx];
+    if (!b) return;
+    readerBox.innerHTML =
+      '<button class="reader__close" id="rClose" aria-label="닫기">×</button>' +
+      (b.kicker ? '<div class="reader__kicker">' + Paper.esc(b.kicker) + "</div>" : "") +
+      '<h1 class="reader__title">' + Paper.esc(b.title) + "</h1>" +
+      '<div class="reader__meta">' +
+        "<span>" + Paper.esc(Paper.fmtDate(issue.date)) + "</span>" +
+        (b.byline ? "<span>" + Paper.esc(b.byline) + "</span>" : "") +
+        "<span>" + Paper.esc(page.label || "") + "면</span>" +
+      "</div>" +
+      (b.image ? '<img src="' + Paper.esc(b.image) + '" alt="">' : "") +
+      '<div class="reader__body">' +
+        Paper.paras(b.body).map(function (t) { return "<p>" + Paper.esc(t) + "</p>"; }).join("") +
+      "</div>";
+    reader.hidden = false;
+    document.body.style.overflow = "hidden";
+    document.getElementById("rClose").addEventListener("click", closeReader);
+  }
+  function closeReader() {
+    reader.hidden = true;
+    document.body.style.overflow = "";
+  }
+  reader.addEventListener("click", function (e) { if (e.target === reader) closeReader(); });
+
+  deck.addEventListener("click", function (e) {
+    var el = e.target.closest ? e.target.closest("[data-read]") : null;
+    if (!el) return;
+    var sheet = el.closest(".sheet");
+    if (!sheet) return;
+    if (+sheet.dataset.i !== cur) return;   // 지금 보이는 면만
+    openReader(+sheet.dataset.i, +el.dataset.read);
+  });
+
+  /* ---------------- 날짜 내비게이션 ---------------- */
+  function buildDates() {
+    dateSel.innerHTML = "";
+    data.issues.forEach(function (iss, i) {
+      var o = document.createElement("option");
+      o.value = i;
+      o.textContent = Paper.fmtDate(iss.date) + "   (" + (iss.pages || []).length + "면)";
+      dateSel.appendChild(o);
+    });
+    dateSel.value = 0;
+    syncDateNav();
+  }
+  function syncDateNav() {
+    var i = +dateSel.value;
+    document.getElementById("prevDate").disabled = i >= data.issues.length - 1;
+    document.getElementById("nextDate").disabled = i <= 0;
+  }
+  dateSel.addEventListener("change", function () {
+    buildIssue(data.issues[+dateSel.value]);
+    syncDateNav();
+  });
+  // 목록은 최신 → 과거 순서입니다. ◀ 는 과거로, ▶ 는 최신으로.
+  document.getElementById("prevDate").addEventListener("click", function () {
+    var i = +dateSel.value; if (i < data.issues.length - 1) { dateSel.value = i + 1; dateSel.dispatchEvent(new Event("change")); }
+  });
+  document.getElementById("nextDate").addEventListener("click", function () {
+    var i = +dateSel.value; if (i > 0) { dateSel.value = i - 1; dateSel.dispatchEvent(new Event("change")); }
+  });
+
+  /* ---------------- 연결 ---------------- */
+  document.getElementById("btnNext").addEventListener("click", next);
+  document.getElementById("btnPrev").addEventListener("click", prev);
+  makeDraggable(grabR, 1);
+  makeDraggable(grabL, -1);
+
+  document.addEventListener("keydown", function (e) {
+    if (!reader.hidden) { if (e.key === "Escape") closeReader(); return; }
+    if (e.key === "ArrowRight") next();
+    if (e.key === "ArrowLeft") prev();
+  });
+
+  window.addEventListener("resize", fit);
+
+  Paper.load({ draft: isDraft }).then(function (d) {
+    data = d;
+    if (!data || !data.issues || !data.issues.length) {
+      stage.innerHTML = '<p style="font-family:var(--sans)">아직 발행된 지면이 없습니다. 편집 화면에서 지면을 만들어 주세요.</p>';
+      return;
+    }
+    // 최신 발행일이 먼저 오도록
+    data.issues.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+    if (isDraft) {
+      document.getElementById("hint").textContent =
+        "※ 편집 중인 원고를 보고 있습니다 (이 브라우저에만 저장된 내용입니다)";
+    }
+    buildDates();
+    buildIssue(data.issues[0]);
+  });
+})();
+</script>
+</body>
+</html>
