@@ -85,57 +85,96 @@ window.Paper = (function () {
 
   /* ---------- 지면 그리기 ---------- */
 
-  /* 블록을 12단 격자에 순서대로 앉히면서
-     "이 블록이 줄의 첫 칸인지 / 둘째 줄 이후인지" 를 미리 계산합니다.
-     세로 괘선과 가로 괘선을 신문처럼 넣기 위해서입니다. */
+  /* 블록을 12단 격자에 순서대로 앉히면서 '줄(row)' 로 묶습니다.
+     지면은 줄을 위에서 아래로 쌓은 것이고, 줄 높이는 글 분량만큼 자랍니다.
+     fill 이 붙은 칸이 있는 줄은 남는 높이를 전부 받습니다. */
   function place(blocks) {
-    var col = 0, row = 0, out = [];
+    var rows = [], cur = [], col = 0;
+    function close() {
+      if (!cur.length) return;
+      cur[cur.length - 1].last = true;
+      rows.push({ items: cur, fill: cur.some(function (it) { return !!it.b.fill; }) });
+      cur = []; col = 0;
+    }
     blocks.forEach(function (b) {
       var span = Math.max(1, Math.min(12, +b.span || 12));
-      if (col + span > 12) { col = 0; row++; }
-      out.push({ b: b, span: span, first: col === 0, row: row, last: col + span >= 12 });
+      if (col + span > 12) close();
+      cur.push({ b: b, span: span, first: col === 0, last: false });
       col += span;
-      if (col >= 12) { col = 0; row++; }
+      if (col >= 12) close();
     });
-    return out;
+    close();
+    return rows;
   }
 
-  function articleHTML(b, sizeClass) {
+  function articleHTML(b) {
     var h = "";
     if (b.kicker) h += '<div class="art__kicker">' + esc(b.kicker) + "</div>";
     /* head = 지면에 싣는 짧은 제목. 없으면 원래 제목을 씁니다. */
     h += '<h2 class="art__title">' + esc(b.head || b.title) + "</h2>";
 
+    /* 부제 — 줄이 둘 이상일 때만 신문처럼 가운뎃점을 답니다.
+       한 줄짜리는 그냥 한 문장이므로 점을 붙이면 어색합니다. */
     var sub = lines(b.subtitle);
     if (sub.length) {
-      h += '<div class="art__sub">' +
+      h += '<div class="art__sub' + (sub.length > 1 ? " art__sub--list" : "") + '">' +
         sub.map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
         "</div>";
     }
     if (b.image) {
-      h += '<figure class="art__fig"' +
-        (b.imgh ? ' style="--imgh:' + (+b.imgh) + 'px"' : "") +
-        '><img src="' + esc(b.image) + '" alt=""' +
+      h += '<figure class="art__fig"><img src="' + esc(b.image) + '" alt=""' +
         (b.imgh ? ' style="height:' + (+b.imgh) + 'px"' : "") + ">" +
         (b.caption ? "<figcaption>" + esc(b.caption) + "</figcaption>" : "") +
         "</figure>";
     }
+    /* 본문 — 칸에 맞춰 줄인 글이라 잘리지 않습니다.
+       verse 는 행을 나눠 쓴 글(시·수필). 들여쓰기 없이 줄을 그대로 살립니다. */
     var cols = Math.max(1, +b.cols || 1);
-    h += '<div class="art__body clip" style="column-count:' + cols +
+    h += '<div class="art__body' + (b.verse ? " art__body--verse" : "") +
+      '" style="column-count:' + cols +
       ';column-gap:13px;column-rule:1px solid var(--hair)">' +
       paras(b.body).map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
       "</div>";
-    h += '<div class="more">전문 보기 ▸</div>';
-    if (b.byline) h += '<div class="art__byline">' + esc(b.byline) + "</div>";
+
+    h += '<div class="art__foot">';
+    if (b.byline) h += "<span>" + esc(b.byline) + "</span>";
+    if (b.link) h += '<span class="art__more">구름헤럴드에서 전문 ▸</span>';
+    h += "</div>";
     return h;
   }
 
   function adHTML(b) {
+    /* 높이를 따로 정하지 않은 광고 칸은 억지로 키우지 않습니다.
+       남는 자리를 받는 칸(fill)에 최소 높이를 박아 두면 지면이 넘칩니다. */
+    var mh = b.height ? "min-height:" + (+b.height) + "px;" : "";
+
+    /* ① 사진 광고 — 만들어 둔 이미지를 그대로 붙입니다 */
     if (b.image) {
-      return '<div class="adslot filled" style="min-height:' + (+b.height || 150) +
-        'px"><img src="' + esc(b.image) + '" alt="' + esc(b.label || "광고") + '"></div>';
+      return '<div class="adslot filled" style="' + mh + '"><img src="' + esc(b.image) +
+        '" alt="' + esc(b.label || "광고") + '"></div>';
     }
-    return '<div class="adslot" style="min-height:' + (+b.height || 150) + 'px">' +
+
+    /* ② 글자 광고 — 신문 하단 통광고 모양을 HTML 로 짭니다.
+       한글이 또렷하게 나오고 어느 크기에서도 깨지지 않습니다.
+       (AI 로 만든 그림에 한글을 넣으면 글자가 뭉개집니다) */
+    if (b.adStyle === "text") {
+      var bg = b.bg || "#0b3f8f", fg = b.fg || "#ffffff", ac = b.accent || "#ffd400";
+      var pts = lines(b.points);
+      return '<div class="adbox" style="background:' + esc(bg) + ";color:" + esc(fg) + ";" + mh + '">' +
+        (b.eyebrow ? '<div class="adbox__eyebrow" style="background:' + esc(ac) +
+          '">' + esc(b.eyebrow) + "</div>" : "") +
+        '<div class="adbox__title">' + esc(b.title || "") + "</div>" +
+        (pts.length ? '<div class="adbox__points">' + pts.map(function (t) {
+          return '<span style="border-color:' + esc(ac) + '">' + esc(t) + "</span>";
+        }).join("") + "</div>" : "") +
+        (b.phone ? '<div class="adbox__phone" style="color:' + esc(ac) + '">' +
+          esc(b.phone) + "</div>" : "") +
+        (b.fine ? '<div class="adbox__fine">' + esc(b.fine) + "</div>" : "") +
+        "</div>";
+    }
+
+    /* ③ 아무것도 안 넣은 칸 — 여백으로 비워 둡니다 */
+    return '<div class="adslot" style="' + mh + '">' +
       '<div class="adslot__label">' + esc(b.label || "광고 자리") + "</div>" +
       (b.note ? '<div class="adslot__size">' + esc(b.note) + "</div>" : "") +
       "</div>";
@@ -173,29 +212,32 @@ window.Paper = (function () {
 
   /* 지면 한 장 → HTML */
   function renderPage(issue, page) {
-    var items = place(page.blocks || []);
-    var body = items.map(function (it, i) {
-      var b = it.b;
-      var cls = ["blk"];
-      if (it.first) cls.push("no-left");
-      if (it.row > 0) cls.push("has-top");
-      if (it.last) cls.push("is-last-col");
+    var rows = place(page.blocks || []);
+    var idx = 0;
+    var body = rows.map(function (row, ri) {
+      var inner = row.items.map(function (it) {
+        var b = it.b, i = idx++;
+        var cls = ["blk"];
+        if (it.first) cls.push("no-left");
+        if (it.last) cls.push("is-last-col");
 
-      var inner = "", extra = "";
-      if (b.type === "masthead")      { cls.push("masthead"); inner = mastheadHTML(b, issue); }
-      else if (b.type === "pagehead") { cls.push("pagehead"); inner = pageheadHTML(b, issue, page); }
-      else if (b.type === "ad")       { inner = adHTML(b); }
-      else if (b.type === "notebox")  { cls.push("notebox"); inner = noteboxHTML(b); }
-      else {
-        cls.push("art", "art--" + (b.size || "minor"));
-        if (b.boxed) cls.push("art--boxed");
-        inner = articleHTML(b);
-        extra = ' data-read="' + i + '"';
-      }
-      var st = "grid-column:span " + it.span;
-      if (b.h) st += ";height:" + (+b.h) + "px";
-      return '<div class="' + cls.join(" ") + '" style="' + st + '"' +
-        extra + ">" + inner + "</div>";
+        var html = "", extra = "";
+        if (b.type === "masthead")      { cls.push("masthead"); html = mastheadHTML(b, issue); }
+        else if (b.type === "pagehead") { cls.push("pagehead"); html = pageheadHTML(b, issue, page); }
+        else if (b.type === "ad")       { html = adHTML(b); }
+        else if (b.type === "notebox")  { cls.push("notebox"); html = noteboxHTML(b); }
+        else {
+          cls.push("art", "art--" + (b.size || "minor"));
+          if (b.boxed) cls.push("art--boxed");
+          html = articleHTML(b);
+          extra = ' data-read="' + i + '"';
+        }
+        var st = "grid-column:span " + it.span;
+        if (b.h) st += ";min-height:" + (+b.h) + "px";
+        return '<div class="' + cls.join(" ") + '" style="' + st + '"' + extra + ">" + html + "</div>";
+      }).join("");
+      return '<div class="row' + (row.fill ? " row--fill" : "") +
+        (ri > 0 ? " row--rule" : "") + '">' + inner + "</div>";
     }).join("");
 
     return '<div class="page"><div class="grid">' + body + "</div></div>";

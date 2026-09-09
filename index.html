@@ -15,8 +15,8 @@
 <div class="desk">
 
   <div class="stage" id="stage">
-    <div class="deck" id="deck">
-      <!-- 종이는 자바스크립트가 넣습니다 -->
+    <div class="viewport" id="viewport">
+      <div class="deck" id="deck"><!-- 종이는 자바스크립트가 넣습니다 --></div>
       <div class="grab left"  id="grabL" aria-label="앞 면으로"></div>
       <div class="grab right" id="grabR" aria-label="다음 면으로"></div>
     </div>
@@ -31,16 +31,17 @@
 
     <div class="pagerdots" id="pager"></div>
 
-    <button class="btn" id="btnPrev">◀ 앞 면</button>
-    <button class="btn" id="btnNext">다음 면 ▶</button>
+    <button class="btn" id="btnPrev">◀ 앞</button>
+    <button class="btn" id="btnNext">다음 ▶</button>
+    <button class="btn" id="btnMode">한 면씩</button>
     <a class="btn btn--ghost" href="admin.html">편집</a>
 
-    <div class="hint" id="hint">종이의 오른쪽 끝을 잡아 끌면 넘어갑니다 · 기사를 누르면 전문이 열립니다 · ← → 키</div>
+    <div class="hint" id="hint">종이의 오른쪽 끝을 잡아 끌면 넘어갑니다 · 기사를 누르면 크게 읽힙니다 · ← → 키</div>
   </div>
 
 </div>
 
-<!-- 기사 전문 -->
+<!-- 기사 읽기 -->
 <div class="reader" id="reader" hidden>
   <div class="reader__box" id="readerBox"></div>
 </div>
@@ -51,8 +52,9 @@
 (function () {
   "use strict";
 
-  var PAGE_W = 1000, PAGE_H = 1390;
+  var W = 1000, H = 1390;            // 지면 한 장의 크기
   var stage = document.getElementById("stage");
+  var viewport = document.getElementById("viewport");
   var deck  = document.getElementById("deck");
   var grabL = document.getElementById("grabL");
   var grabR = document.getElementById("grabR");
@@ -61,57 +63,100 @@
   var reader = document.getElementById("reader");
   var readerBox = document.getElementById("readerBox");
 
-  var data = null;      // 전체 자료
-  var issue = null;     // 지금 보는 호(號)
-  var sheets = [];      // 종이 DOM
-  var cur = 0;          // 지금 펼쳐진 면 번호 (0부터)
+  var data = null, issue = null;
+  var pages = [];        // 면 목록 (A1, A2 …)
+  var sheets = [];       // 종이 DOM — 한 장이 앞뒤 두 면
+  var N = 0;             // 종이 수
+  var turned = 0;        // 넘긴 종이 수 (0 ~ N)
+  var p = 0;             // 한 면씩 볼 때 지금 면 번호
+  var mode = "spread";   // spread(펼침) | single(한 면씩)
+  var k = 1;             // 축소 배율
   var busy = false;
 
   var isDraft = /[?&]draft=1/.test(location.search);
 
-  /* ---------------- 배율 ---------------- */
-  function fit() {
-    var w = stage.clientWidth - 28;
-    var h = stage.clientHeight - 28;
-    var k = Math.min(w / PAGE_W, h / PAGE_H);
-    k = Math.max(0.16, Math.min(k, 1.15));
-    deck.style.width  = (PAGE_W * k) + "px";
-    deck.style.height = (PAGE_H * k) + "px";
-    // 종이 자체를 축소합니다. (rotateY 는 축이 왼쪽 모서리라 축소와 같이 걸어도 됩니다)
-    sheets.forEach(function (s) { s.dataset.k = k; });
-    applyAll();
+  /* ──────────── 지금 상태 ──────────── */
+
+  function sheetOf(page) { return Math.floor(page / 2); }
+  function sideOf(page)  { return page % 2; }          // 0 = 앞면, 1 = 뒷면
+
+  /* 한 면씩 볼 때, 그 면을 보려면 종이를 몇 장 넘겨야 하는가 */
+  function turnedFor(page) {
+    return sideOf(page) === 0 ? sheetOf(page) : sheetOf(page) + 1;
   }
 
-  /* 종이의 실제 변형값 = 축소 × 넘김각도 */
-  function applyTransform(sheet, deg) {
-    var k = +sheet.dataset.k || 1;
-    sheet.style.transform = "scale(" + k + ") rotateY(" + deg + "deg)";
+  /* deck 을 좌우로 얼마나 밀지 */
+  function deckTx(t, page) {
+    if (mode === "spread") {
+      if (t === 0) return -W / 2;       // 첫 장 — 오른쪽 면만 있으니 가운데로
+      if (t === N) return  W / 2;       // 마지막 — 왼쪽 면만 있으니 가운데로
+      return 0;
+    }
+    return sideOf(page) === 1 ? 0 : -W; // 뒷면은 왼쪽 절반, 앞면은 오른쪽 절반
   }
-  function applyAll() {
+
+  function applyDeck(tx) {
+    deck.style.transform = "scale(" + k + ") translateX(" + tx + "px)";
+  }
+
+  function applySheets(t, dragIdx, dragDeg, dragZ) {
     sheets.forEach(function (s, i) {
-      applyTransform(s, i < cur ? -180 : 0);
-      s.style.zIndex = i < cur ? i : (sheets.length - i);
-      s.querySelector(".shade").style.opacity = 0;
+      var deg = (i < t) ? -180 : 0;
+      var z   = (i < t) ? i : (N - i);
+      if (i === dragIdx) { deg = dragDeg; z = dragZ; }
+      s.style.transform = "rotateY(" + deg + "deg)";
+      s.style.zIndex = z;
+      var sh = s.querySelector(".shade");
+      if (sh) sh.style.opacity = Math.min(0.5, Math.abs(deg) / 180 * 0.5);
     });
   }
 
-  /* ---------------- 지면 만들기 ---------------- */
+  function apply() {
+    applySheets(turned);
+    applyDeck(deckTx(turned, p));
+  }
+
+  /* ──────────── 크기 맞추기 ──────────── */
+
+  function fit() {
+    var availW = stage.clientWidth - 28;
+    var availH = stage.clientHeight - 28;
+    var wide = mode === "spread" ? W * 2 : W;
+    k = Math.min(availW / wide, availH / H);
+    k = Math.max(0.12, Math.min(k, 1.1));
+    viewport.style.width  = (wide * k) + "px";
+    viewport.style.height = (H * k) + "px";
+    apply();
+  }
+
+  /* ──────────── 지면 만들기 ──────────── */
+
   function buildIssue(iss) {
     issue = iss;
-    sheets.forEach(function (s) { s.remove(); });
+    pages = iss.pages || [];
+    deck.innerHTML = "";
     sheets = [];
-    cur = 0;
+    N = Math.ceil(pages.length / 2);
+    turned = 0;
+    p = 0;
 
-    (iss.pages || []).forEach(function (page, i) {
+    for (var i = 0; i < N; i++) {
+      var front = pages[i * 2];
+      var back  = pages[i * 2 + 1];
       var sheet = document.createElement("div");
       sheet.className = "sheet";
-      sheet.innerHTML =
-        '<div class="face front">' + Paper.renderPage(iss, page) + '<div class="shade"></div></div>' +
-        '<div class="face back"></div>';
       sheet.dataset.i = i;
-      deck.insertBefore(sheet, grabL);
+      sheet.innerHTML =
+        '<div class="face front" data-page="' + (i * 2) + '">' +
+          (front ? Paper.renderPage(iss, front) : "") +
+          '<div class="shade"></div>' +
+        "</div>" +
+        '<div class="face back" data-page="' + (i * 2 + 1) + '">' +
+          (back ? Paper.renderPage(iss, back) : "") +
+        "</div>";
+      deck.appendChild(sheet);
       sheets.push(sheet);
-    });
+    }
 
     buildPager();
     fit();
@@ -120,125 +165,157 @@
 
   function buildPager() {
     pager.innerHTML = "";
-    (issue.pages || []).forEach(function (p, i) {
+    pages.forEach(function (pg, i) {
       var b = document.createElement("button");
-      b.textContent = p.label || (i + 1);
-      b.addEventListener("click", function () { goTo(i); });
+      b.textContent = pg.label || (i + 1);
+      b.addEventListener("click", function () { goToPage(i); });
       pager.appendChild(b);
     });
   }
 
-  function updateNav() {
-    Array.prototype.forEach.call(pager.children, function (b, i) {
-      b.setAttribute("aria-current", i === cur ? "true" : "false");
-    });
-    document.getElementById("btnPrev").disabled = cur === 0;
-    document.getElementById("btnNext").disabled = cur >= sheets.length - 1;
-    grabR.classList.toggle("off", cur >= sheets.length - 1);
-    grabL.classList.toggle("off", cur === 0);
+  /* 지금 보이는 면들 */
+  function visiblePages() {
+    if (mode === "single") return [p];
+    var out = [];
+    if (turned > 0) out.push(turned * 2 - 1);
+    if (turned < N) out.push(turned * 2);
+    return out.filter(function (i) { return i < pages.length; });
   }
 
-  /* ---------------- 넘기기 ---------------- */
-  function goTo(target) {
-    if (busy || target === cur || target < 0 || target >= sheets.length) return;
-    var forward = target > cur;
-    busy = true;
+  function updateNav() {
+    var vis = visiblePages();
+    Array.prototype.forEach.call(pager.children, function (b, i) {
+      b.setAttribute("aria-current", vis.indexOf(i) >= 0 ? "true" : "false");
+    });
+    var atStart = mode === "single" ? p === 0 : turned === 0;
+    var atEnd   = mode === "single" ? p >= pages.length - 1 : turned >= N;
+    document.getElementById("btnPrev").disabled = atStart;
+    document.getElementById("btnNext").disabled = atEnd;
+    grabL.classList.toggle("off", atStart);
+    grabR.classList.toggle("off", atEnd);
+    document.getElementById("btnMode").textContent =
+      mode === "spread" ? "한 면씩" : "펼쳐 보기";
+  }
 
-    // 한 장씩만 부드럽게 넘깁니다 (여러 장이면 즉시 이동 후 마지막 한 장만 연출)
-    if (Math.abs(target - cur) > 1) {
-      cur = forward ? target - 1 : target + 1;
-      applyAll();
+  /* ──────────── 한 걸음이 무엇인지 ────────────
+     앞으로 한 걸음이 '종이를 넘기는 것(flip)'인지
+     '옆 장으로 옮기는 것(slide)'인지 알려 줍니다. */
+  function stepInfo(dir) {          // dir: 1 앞으로, -1 뒤로
+    if (mode === "spread") {
+      var t2 = turned + dir;
+      if (t2 < 0 || t2 > N) return null;
+      return { kind: "flip", sheet: dir === 1 ? turned : turned - 1,
+               turned: t2, page: p, tx0: deckTx(turned, p), tx1: deckTx(t2, p) };
     }
+    var p2 = p + dir;
+    if (p2 < 0 || p2 >= pages.length) return null;
+    var t2s = turnedFor(p2);
+    return {
+      kind: t2s === turned ? "slide" : "flip",
+      sheet: dir === 1 ? turned : turned - 1,
+      turned: t2s, page: p2,
+      tx0: deckTx(turned, p), tx1: deckTx(t2s, p2)
+    };
+  }
 
-    var idx = forward ? cur : cur - 1;
-    var sheet = sheets[idx];
-    var shade = sheet.querySelector(".shade");
+  function commit(step) {
+    turned = step.turned;
+    p = step.page;
+    apply();
+    updateNav();
+  }
 
-    sheet.style.zIndex = 100;
-    sheet.classList.add("is-animating");
-    shade.style.transition = "opacity .82s";
-    applyTransform(sheet, forward ? -180 : 0);
-    shade.style.opacity = forward ? 0.5 : 0;
+  function animate(step) {
+    if (busy || !step) return;
+    busy = true;
+    var s = step.kind === "flip" ? sheets[step.sheet] : null;
+    if (s) s.classList.add("is-animating");
+    deck.classList.add("is-animating");
+
+    if (s) applySheets(turned, step.sheet, (step.turned > turned) ? -180 : 0, 100);
+    else applySheets(turned);
+    applyDeck(step.tx1);
 
     window.setTimeout(function () {
-      sheet.classList.remove("is-animating");
-      shade.style.transition = "";
-      cur = target;
-      applyAll();
-      updateNav();
+      if (s) s.classList.remove("is-animating");
+      deck.classList.remove("is-animating");
+      commit(step);
       busy = false;
     }, 840);
   }
 
-  function next() { goTo(cur + 1); }
-  function prev() { goTo(cur - 1); }
+  function next() { animate(stepInfo(1)); }
+  function prev() { animate(stepInfo(-1)); }
 
-  /* 끌어서 넘기기 */
+  function goToPage(target) {
+    if (busy || target < 0 || target >= pages.length) return;
+    if (mode === "single") {
+      if (target === p) return;
+      p = target; turned = turnedFor(p);
+    } else {
+      var t = Math.min(N, sheetOf(target) + (sideOf(target) === 1 ? 1 : 0));
+      if (t === turned) { updateNav(); return; }
+      turned = t;
+    }
+    apply();
+    updateNav();
+  }
+
+  /* ──────────── 끌어서 넘기기 ──────────── */
   function makeDraggable(handle, dir) {
-    var active = null, startX = 0, moved = 0, sheet = null, shade = null;
+    var active = null, startX = 0, moved = 0, step = null;
 
     handle.addEventListener("pointerdown", function (e) {
       if (busy) return;
-      moved = 0;
-      var idx = dir === 1 ? cur : cur - 1;
-      if (idx < 0 || idx >= sheets.length) return;
-      if (dir === 1 && cur >= sheets.length - 1) return;
-      if (dir === -1 && cur === 0) return;
-
-      active = e.pointerId;
-      startX = e.clientX;
-      sheet = sheets[idx];
-      shade = sheet.querySelector(".shade");
-      sheet.style.zIndex = 100;
-      sheet.classList.remove("is-animating");
+      step = stepInfo(dir);
+      if (!step) return;
+      active = e.pointerId; startX = e.clientX; moved = 0;
       handle.setPointerCapture(e.pointerId);
     });
 
     handle.addEventListener("pointermove", function (e) {
-      if (active !== e.pointerId || !sheet) return;
-      var w = deck.clientWidth || 1;
+      if (active !== e.pointerId || !step) return;
+      var w = viewport.clientWidth || 1;
       var dx = e.clientX - startX;
       moved = Math.max(moved, Math.abs(dx));
-      var deg = dir === 1
-        ? Math.max(-180, Math.min(0, (dx / w) * 180))
-        : Math.max(-180, Math.min(0, -180 + (dx / w) * 180));
-      applyTransform(sheet, deg);
-      shade.style.opacity = Math.min(0.5, Math.abs(deg) / 180 * 0.5);
+      var t = Math.max(0, Math.min(1, (dir === 1 ? -dx : dx) / w));
+      if (step.kind === "flip") {
+        var forward = step.turned > turned;
+        var deg = forward ? -180 * t : -180 * (1 - t);
+        applySheets(turned, step.sheet, deg, 100);
+      }
+      applyDeck(step.tx0 + (step.tx1 - step.tx0) * t);
       e.preventDefault();
     });
 
     function finish(e) {
       if (active !== e.pointerId) return;
       active = null;
-      if (!sheet) return;
+      var st = step; step = null;
+      if (!st) return;
 
-      var w = deck.clientWidth || 1;
+      if (moved < 6) { animate(st); return; }   // 그냥 눌렀다 → 한 걸음
+
+      var w = viewport.clientWidth || 1;
       var dx = e.clientX - startX;
-      var s = sheet, sh = shade;
-      sheet = null; shade = null;
-
-      // 거의 안 움직였으면 "그냥 눌렀다"로 봅니다 → 한 장 넘김
-      if (moved < 6) {
-        applyTransform(s, dir === 1 ? 0 : -180);
-        sh.style.opacity = dir === 1 ? 0 : 0.5;
-        if (dir === 1) next(); else prev();
-        return;
-      }
-
-      var passed = dir === 1 ? (dx < -w * 0.22) : (dx > w * 0.22);
-      var settle = dir === 1 ? (passed ? -180 : 0) : (passed ? 0 : -180);
-
-      s.classList.add("is-animating");
-      sh.style.transition = "opacity .5s";
-      applyTransform(s, settle);
-      sh.style.opacity = settle === 0 ? 0 : 0.5;
+      var t = Math.max(0, Math.min(1, (dir === 1 ? -dx : dx) / w));
+      var passed = t > 0.22;
 
       busy = true;
+      var s = st.kind === "flip" ? sheets[st.sheet] : null;
+      if (s) s.classList.add("is-animating");
+      deck.classList.add("is-animating");
+      if (s) {
+        var forward = st.turned > turned;
+        var settle = passed ? (forward ? -180 : 0) : (forward ? 0 : -180);
+        applySheets(turned, st.sheet, settle, 100);
+      }
+      applyDeck(passed ? st.tx1 : st.tx0);
+
       window.setTimeout(function () {
-        s.classList.remove("is-animating");
-        sh.style.transition = "";
-        if (passed) cur = dir === 1 ? cur + 1 : cur - 1;
-        applyAll();
+        if (s) s.classList.remove("is-animating");
+        deck.classList.remove("is-animating");
+        if (passed) commit(st); else apply();
         updateNav();
         busy = false;
       }, 520);
@@ -247,24 +324,30 @@
     handle.addEventListener("pointercancel", finish);
   }
 
-  /* ---------------- 기사 전문 ---------------- */
+  /* ──────────── 기사 읽기 ──────────── */
   function openReader(pageIdx, blockIdx) {
-    var page = issue.pages[pageIdx];
+    var page = pages[pageIdx];
+    if (!page) return;
     var b = (page.blocks || [])[blockIdx];
     if (!b) return;
     readerBox.innerHTML =
       '<button class="reader__close" id="rClose" aria-label="닫기">×</button>' +
       (b.kicker ? '<div class="reader__kicker">' + Paper.esc(b.kicker) + "</div>" : "") +
-      '<h1 class="reader__title">' + Paper.esc(b.title) + "</h1>" +
+      '<h1 class="reader__title">' + Paper.esc(b.head || b.title) + "</h1>" +
       '<div class="reader__meta">' +
         "<span>" + Paper.esc(Paper.fmtDate(issue.date)) + "</span>" +
         (b.byline ? "<span>" + Paper.esc(b.byline) + "</span>" : "") +
         "<span>" + Paper.esc(page.label || "") + "면</span>" +
       "</div>" +
       (b.image ? '<img src="' + Paper.esc(b.image) + '" alt="">' : "") +
-      '<div class="reader__body">' +
+      '<div class="reader__body' + (b.verse ? " reader__body--verse" : "") + '">' +
         Paper.paras(b.body).map(function (t) { return "<p>" + Paper.esc(t) + "</p>"; }).join("") +
-      "</div>";
+      "</div>" +
+      (b.link
+        ? '<p class="reader__link"><a href="' + Paper.esc(b.link) +
+          '" target="_blank" rel="noopener">구름헤럴드에서 기사 전문 보기 ↗</a></p>' +
+          '<p class="reader__note">지면에 실린 글은 칸에 맞춰 줄인 요약입니다.</p>'
+        : "");
     reader.hidden = false;
     document.body.style.overflow = "hidden";
     document.getElementById("rClose").addEventListener("click", closeReader);
@@ -278,13 +361,14 @@
   deck.addEventListener("click", function (e) {
     var el = e.target.closest ? e.target.closest("[data-read]") : null;
     if (!el) return;
-    var sheet = el.closest(".sheet");
-    if (!sheet) return;
-    if (+sheet.dataset.i !== cur) return;   // 지금 보이는 면만
-    openReader(+sheet.dataset.i, +el.dataset.read);
+    var face = el.closest(".face");
+    if (!face) return;
+    var pageIdx = +face.dataset.page;
+    if (visiblePages().indexOf(pageIdx) < 0) return;   // 지금 보이는 면만
+    openReader(pageIdx, +el.dataset.read);
   });
 
-  /* ---------------- 날짜 내비게이션 ---------------- */
+  /* ──────────── 날짜 ──────────── */
   function buildDates() {
     dateSel.innerHTML = "";
     data.issues.forEach(function (iss, i) {
@@ -305,17 +389,24 @@
     buildIssue(data.issues[+dateSel.value]);
     syncDateNav();
   });
-  // 목록은 최신 → 과거 순서입니다. ◀ 는 과거로, ▶ 는 최신으로.
   document.getElementById("prevDate").addEventListener("click", function () {
-    var i = +dateSel.value; if (i < data.issues.length - 1) { dateSel.value = i + 1; dateSel.dispatchEvent(new Event("change")); }
+    var i = +dateSel.value;
+    if (i < data.issues.length - 1) { dateSel.value = i + 1; dateSel.dispatchEvent(new Event("change")); }
   });
   document.getElementById("nextDate").addEventListener("click", function () {
-    var i = +dateSel.value; if (i > 0) { dateSel.value = i - 1; dateSel.dispatchEvent(new Event("change")); }
+    var i = +dateSel.value;
+    if (i > 0) { dateSel.value = i - 1; dateSel.dispatchEvent(new Event("change")); }
   });
 
-  /* ---------------- 연결 ---------------- */
+  /* ──────────── 연결 ──────────── */
   document.getElementById("btnNext").addEventListener("click", next);
   document.getElementById("btnPrev").addEventListener("click", prev);
+  document.getElementById("btnMode").addEventListener("click", function () {
+    mode = mode === "spread" ? "single" : "spread";
+    if (mode === "single") p = Math.min(pages.length - 1, turned === 0 ? 0 : turned * 2 - 1);
+    else turned = turnedFor(p);
+    fit(); updateNav();
+  });
   makeDraggable(grabR, 1);
   makeDraggable(grabL, -1);
 
@@ -327,14 +418,16 @@
 
   window.addEventListener("resize", fit);
 
+  /* ──────────── 시작 ──────────── */
   Paper.load({ draft: isDraft }).then(function (d) {
     data = d;
     if (!data || !data.issues || !data.issues.length) {
       stage.innerHTML = '<p style="font-family:var(--sans)">아직 발행된 지면이 없습니다. 편집 화면에서 지면을 만들어 주세요.</p>';
       return;
     }
-    // 최신 발행일이 먼저 오도록
     data.issues.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+    // 좁은 화면에서 두 면을 나란히 놓으면 글씨가 너무 작아집니다
+    if (window.innerWidth < 900) mode = "single";
     if (isDraft) {
       document.getElementById("hint").textContent =
         "※ 편집 중인 원고를 보고 있습니다 (이 브라우저에만 저장된 내용입니다)";

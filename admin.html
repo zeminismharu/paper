@@ -171,8 +171,8 @@
   <!-- ③ 미리보기 -->
   <div class="col">
     <h2 class="sec">미리보기</h2>
-    <p class="sub">실제 지면과 같은 비율입니다. 아래로 넘치는 글은 지면에서 잘리고,
-      독자가 기사를 누르면 전문이 열립니다.</p>
+    <p class="sub">실제 지면과 같은 비율입니다. 칸은 글 분량만큼 자라고,
+      남는 자리는 <b>광고 칸</b>이 받습니다. 넘치면 위쪽 안내 상자가 알려 줍니다.</p>
     <div class="pv">
       <div class="pvbox" id="pvbox"><div class="pvinner" id="pvinner"></div></div>
     </div>
@@ -309,22 +309,26 @@
       ul.appendChild(li);
     });
 
-    // 높이 합계 안내
-    var rows = Paper.place(blocks);
-    var used = 0, seen = {};
-    rows.forEach(function (it) {
-      if (!seen[it.row]) { seen[it.row] = 0; }
-      seen[it.row] = Math.max(seen[it.row], +it.b.h || 0);
-    });
-    Object.keys(seen).forEach(function (k) { used += seen[k]; });
-    var left = CONTENT_H - used;
-    var g = $("gauge");
-    g.className = "gauge " + (Math.abs(left) <= 12 ? "ok" : "bad");
-    g.innerHTML = "지면 한 장의 높이는 <b>" + CONTENT_H + "px</b> 입니다.<br>" +
-      "지금 배정된 높이 합계 <b>" + used + "px</b> — " +
-      (Math.abs(left) <= 12 ? "딱 맞습니다."
-        : left > 0 ? "<b>" + left + "px</b> 남습니다. 어느 칸의 높이를 늘려 주세요."
-                   : "<b>" + (-left) + "px</b> 넘칩니다. 아래쪽이 잘립니다.");
+  }
+
+  /* 지면이 넘치는지 실제로 재서 알려 줍니다.
+     px 를 더하는 계산이 아니라 브라우저가 그린 결과를 그대로 잽니다. */
+  function checkFit() {
+    var g = $("pvinner").querySelector(".grid");
+    var el = $("gauge");
+    if (!g) { el.textContent = ""; return; }
+    var over = g.scrollHeight - g.clientHeight;
+    if (over > 2) {
+      el.className = "gauge bad";
+      el.innerHTML = "이 면의 글이 <b>" + over + "px</b> 넘칩니다. 아래쪽이 잘립니다.<br>" +
+        "요약을 줄이거나 사진 높이를 낮춰 주세요.";
+    } else if (over < -2) {
+      el.className = "gauge ok";
+      el.innerHTML = "지면에 딱 맞습니다. 남는 자리는 <b>광고 칸</b>이 받습니다.";
+    } else {
+      el.className = "gauge ok";
+      el.innerHTML = "지면에 딱 맞습니다.";
+    }
   }
 
   /* ---------------- 편집 폼 ---------------- */
@@ -332,7 +336,8 @@
     opts = opts || {};
     var b = block();
     var v = b[key] == null ? "" : b[key];
-    if (key === "boxed") v = b.boxed ? "1" : "";   /* 예/아니오 선택에 맞춰 줍니다 */
+    /* 예/아니오 선택에 값을 맞춰 줍니다 */
+    if (key === "boxed" || key === "verse" || key === "fill") v = b[key] ? "1" : "";
     var id = "in_" + key;
     var input;
     if (opts.textarea) {
@@ -369,17 +374,32 @@
         "</div>";
       h += '<div class="row3">' +
         fld("칸 너비 (1~12단)", "span", { type: "number" }) +
-        fld("칸 높이 px", "h", { type: "number" }) +
+        fld("최소 높이 px (비워 두면 알아서)", "h", { type: "number" }) +
         fld("상자 두르기", "boxed", { select: [["", "아니오"], ["1", "예"]] }) +
         "</div>";
+      h += fld("원문 주소 — ‘구름헤럴드에서 전문 보기’ 링크", "link");
+      h += fld("줄 나눔을 그대로 살린다 (시·수필)", "verse",
+        { select: [["", "아니오"], ["1", "예"]] });
     } else if (b.type === "ad") {
-      h += '<p class="sub">광고 자리는 <b>비워 둔 칸</b>입니다. 사진 주소를 넣으면 그 자리에 광고가 들어가고,'
-        + ' 비워 두면 점선 여백으로 남습니다.</p>';
-      h += fld("칸 안에 적을 문구", "label");
+      h += '<p class="sub">광고 자리는 기본이 <b>여백</b>입니다. 채우는 방법은 두 가지입니다 —'
+        + ' <b>사진</b>을 넣거나, <b>글자 광고</b>를 짜 넣습니다.'
+        + ' 글자 광고는 한글이 또렷하게 나오고 어느 크기에서도 깨지지 않습니다.</p>';
+      h += fld("이 칸을 어떻게 채울까요", "adStyle",
+        { select: [["", "여백으로 비워 둔다"], ["text", "글자 광고를 짠다"]] });
+      h += fld("칸 안에 적을 문구 (여백일 때)", "label");
       h += fld("크기 안내 (작게 적히는 줄)", "note");
-      h += fld("광고 이미지 주소(URL) — 채울 때만", "image");
+      h += fld("광고 사진 주소(URL) — 사진으로 채울 때", "image");
+      h += '<p class="sub" style="margin-top:14px">── 글자 광고를 고르셨을 때 ──</p>';
+      h += '<div class="row2">' + fld("어깨 딱지 (예: 분양 안내)", "eyebrow") +
+        fld("전화번호", "phone") + "</div>";
+      h += fld("큰 글씨 문구", "title");
+      h += fld("작은 딱지 — 한 줄에 하나씩", "points", { textarea: true, rows: 3 });
+      h += fld("맨 아래 작은 글씨", "fine");
+      h += '<div class="row3">' + fld("바탕색", "bg") + fld("글자색", "fg") +
+        fld("강조색", "accent") + "</div>";
       h += '<div class="row2">' + fld("칸 너비 (1~12단)", "span", { type: "number" }) +
-        fld("칸 높이 px", "h", { type: "number" }) + "</div>";
+        fld("최소 높이 px (비워 두면 알아서)", "h", { type: "number" }) + "</div>";
+      h += fld("남는 자리를 이 칸이 받는다", "fill", { select: [["", "아니오"], ["1", "예"]] });
     } else if (b.type === "masthead") {
       h += fld("제호", "title");
       h += fld("표어", "tagline");
@@ -423,6 +443,7 @@
     inner.style.transform = "scale(" + k + ")";
     box.style.width = w + "px";
     box.style.height = (PAGE_H * k) + "px";
+    checkFit();
   }
 
   function renderAll() {
