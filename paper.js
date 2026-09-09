@@ -153,11 +153,17 @@ window.Paper = (function () {
         "</figure>";
     }
     /* 본문 — 칸에 맞춰 줄인 글이라 잘리지 않습니다.
-       verse 는 행을 나눠 쓴 글(시·수필). 들여쓰기 없이 줄을 그대로 살립니다. */
+       verse 는 행을 나눠 쓴 글(시·수필). 들여쓰기 없이 줄을 그대로 살립니다.
+
+       ⚠️ 단(段) 사이에 세로줄을 긋지 않습니다.
+       신문에서 세로 괘선은 '서로 다른 기사'를 가르는 선입니다. 한 기사의 본문은
+       첫 단 아래에서 다음 단 위로 이어지는 하나의 글이므로, 그 사이에 선을 그으면
+       한 기사가 여러 토막으로 갈라져 보입니다. 기사끼리의 경계는 .blk 의
+       왼쪽 테두리가 이미 맡고 있습니다. */
     var cols = Math.max(1, +b.cols || 1);
     h += '<div class="art__body' + (b.verse ? " art__body--verse" : "") +
       '" style="column-count:' + cols +
-      ';column-gap:13px;column-rule:1px solid var(--hair)">' +
+      ';column-gap:15px">' +
       paras(b.body).map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
       "</div>";
 
