@@ -7,7 +7,7 @@
 <meta name="description" content="구름헤럴드 지면보기 — 날짜별로 신문 지면을 넘겨 봅니다.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@700;900&family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Serif+KR:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gothic+A1:wght@900&family=Hahmlet:wght@700;900&family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Serif+KR:wght@400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="paper.css">
 </head>
 <body>
@@ -34,12 +34,16 @@
     <button class="btn" id="btnPrev">◀ 앞</button>
     <button class="btn" id="btnNext">다음 ▶</button>
     <button class="btn" id="btnMode">한 면씩</button>
+    <button class="btn" id="btnPdf">PDF 내려받기</button>
     <a class="btn btn--ghost" href="admin.html">편집</a>
 
     <div class="hint" id="hint">종이의 오른쪽 끝을 잡아 끌면 넘어갑니다 · 기사를 누르면 크게 읽힙니다 · ← → 키</div>
   </div>
 
 </div>
+
+<!-- 인쇄(PDF)용 지면. 평소에는 비어 있고, 단추를 눌렀을 때만 채웁니다. -->
+<div class="printout" id="printout" aria-hidden="true"></div>
 
 <!-- 기사 읽기 -->
 <div class="reader" id="reader" hidden>
@@ -58,6 +62,8 @@
   var deck  = document.getElementById("deck");
   var grabL = document.getElementById("grabL");
   var grabR = document.getElementById("grabR");
+  var printout = document.getElementById("printout");
+  var hint = document.getElementById("hint");
   var dateSel = document.getElementById("dateSel");
   var pager = document.getElementById("pager");
   var reader = document.getElementById("reader");
@@ -369,6 +375,40 @@
   });
 
   /* ──────────── 날짜 ──────────── */
+  /* ── PDF 내려받기 ────────────────────────────────────
+     지면을 그림으로 굽지 않고 브라우저 인쇄 기능에 넘깁니다.
+     글자가 글자로 남아 확대해도 또렷하고 파일도 가볍습니다.
+     넘기는 종이(deck)는 3차원으로 뒤집혀 있어서 그대로는
+     인쇄되지 않으므로, 여섯 면을 평평하게 다시 그려 줍니다. */
+  function buildPrintout() {
+    if (!issue) return;
+    printout.innerHTML = issue.pages.map(function (pg) {
+      return '<div class="printsheet"><div class="pagebox">' +
+             Paper.renderPage(issue, pg) +
+             "</div></div>";
+    }).join("");
+  }
+
+  document.getElementById("btnPdf").addEventListener("click", function () {
+    buildPrintout();
+    hint.textContent = "인쇄 창에서 ‘대상’을 ‘PDF로 저장’으로 고르시면 지면이 그대로 저장됩니다.";
+    // 그림이 다 뜬 뒤에 인쇄 창을 엽니다
+    var imgs = Array.prototype.slice.call(printout.querySelectorAll("img"));
+    var wait = imgs.filter(function (im) { return !im.complete; })
+                   .map(function (im) {
+                     return new Promise(function (done) {
+                       im.addEventListener("load", done, { once: true });
+                       im.addEventListener("error", done, { once: true });
+                     });
+                   });
+    Promise.all(wait).then(function () {
+      window.setTimeout(function () { window.print(); }, 60);
+    });
+  });
+
+  // 인쇄가 끝나면 그릇을 비웁니다 (안 비우면 화면이 무거워집니다)
+  window.addEventListener("afterprint", function () { printout.innerHTML = ""; });
+
   function buildDates() {
     dateSel.innerHTML = "";
     data.issues.forEach(function (iss, i) {

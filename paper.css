@@ -19,10 +19,17 @@
   --page-w: 1000px;
   --page-h: 1390px;
 
-  /* 신문은 서체를 세 갈래로 씁니다.
-     제호와 머릿기사 제목 / 나머지 기사 제목 / 본문.
-     하나로 통일하면 무엇이 중요한 기사인지 눈에 들어오지 않습니다. */
-  --display: "Hahmlet", "Noto Serif KR", "Nanum Myeongjo", serif;   /* 제호 · 머릿기사 */
+  /* 신문은 서체를 네 갈래로 씁니다.
+     제호 / 그날의 머릿기사 / 나머지 기사 제목 / 본문.
+     하나로 통일하면 무엇이 중요한 기사인지 눈에 들어오지 않습니다.
+
+     머릿기사만 고딕(획이 굵고 끝이 반듯한 글씨)입니다.
+     조선일보 1면을 재보니 머릿기사 한 꼭지만 고딕이고 나머지는
+     전부 명조였습니다. 서체를 바꾸는 것 자체가 "이게 오늘의 톱"
+     이라는 신호입니다. 크기만 키우는 것보다 훨씬 강하게 읽힙니다. */
+  --display: "Hahmlet", "Noto Serif KR", "Nanum Myeongjo", serif;   /* 제호 */
+  --lead:    "Black Han Sans", "Gothic A1", "Noto Sans KR",
+             "Apple SD Gothic Neo", sans-serif;                     /* 머릿기사 제목 */
   --head:    "Noto Serif KR", "Nanum Myeongjo", serif;              /* 기사 제목 */
   --serif:   "Nanum Myeongjo", "Noto Serif KR", "Apple SD Gothic Neo", serif;  /* 본문 */
   --sans:    "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
@@ -289,13 +296,15 @@ html, body {
   letter-spacing: -.015em;
   word-break: keep-all;
 }
-/* 머릿기사만 제호와 같은 서체로 — 그 면에서 가장 중요한 기사임을 서체로 알립니다 */
+/* 머릿기사 — 그 면에서 가장 중요한 기사임을 서체로 알립니다.
+   Black Han Sans 는 굵기가 하나뿐이라 font-weight 를 올려도 소용없습니다.
+   대신 글자 자체가 이미 아주 굵고 각져 있습니다. */
 .art--lead  .art__title {
-  font-family: var(--display);
-  font-weight: 900;
-  font-size: 37px;
-  line-height: 1.2;
-  letter-spacing: -.03em;
+  font-family: var(--lead);
+  font-weight: 400;
+  font-size: 42px;
+  line-height: 1.15;
+  letter-spacing: -.012em;
 }
 .art--major .art__title { font-size: 26px; font-weight: 900; }
 .art--minor .art__title { font-size: 19px; }
@@ -669,4 +678,53 @@ html, body {
 
 @media print {
   .bar, .grab, .reader { display: none !important; }
+}
+
+
+/* ============================================================
+   지면을 PDF 로 내려받기
+   ------------------------------------------------------------
+   지면을 그림으로 굽지 않고 브라우저의 인쇄 기능을 그대로 씁니다.
+   그래야 글자가 글자로 남아서 — 그림이 아니라 —
+   아무리 확대해도 또렷하고, 파일도 몇백 킬로바이트로 가볍습니다.
+   인쇄 창이 뜨면 '대상'을 'PDF로 저장'으로 고르시면 됩니다.
+
+   종이 크기는 A4 로 맞췄습니다. 지면 한 장이 1000px 이고
+   A4 가로가 210mm(= 793.7px)이라 0.7937 배로 줄이면 딱 맞습니다.
+   ============================================================ */
+
+.printout { display: none; }
+
+@media print {
+  @page { size: A4 portrait; margin: 0; }
+
+  html, body { margin: 0; padding: 0; background: #fff; }
+
+  /* 화면에서 보던 것(열람대·단추·기사 읽기 창)은 인쇄하지 않습니다 */
+  body > *:not(.printout) { display: none !important; }
+  .printout { display: block !important; }
+
+  /* 한 장 = 종이 한 면 */
+  .printsheet {
+    position: relative;
+    width: 210mm;
+    height: 297mm;
+    overflow: hidden;
+    background: var(--paper);
+    break-after: page;
+    page-break-after: always;
+  }
+  .printsheet:last-child { break-after: auto; page-break-after: auto; }
+
+  .printsheet > .pagebox {
+    position: relative;
+    width: var(--page-w);
+    height: var(--page-h);
+    background: var(--paper);
+    transform: scale(.7937);
+    transform-origin: top left;
+  }
+
+  /* 종이색과 광고 자리의 옅은 바탕까지 그대로 인쇄되게 합니다 */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
