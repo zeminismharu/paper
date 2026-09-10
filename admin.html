@@ -7,7 +7,7 @@
 <title>구름헤럴드 편집실</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Serif+KR:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@700;900&family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Serif+KR:wght@400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="paper.css">
 <style>
   /* ── 편집실 화면. 지면 자체의 모양은 paper.css 를 그대로 씁니다. ── */
@@ -377,6 +377,11 @@
       h += fld("본문 — 빈 줄로 문단을 나눕니다", "body", { textarea: true, rows: 12 });
       h += fld("기자 이름 (예: 홍길동 기자)", "byline");
       h += '<div class="row2">' + fld("사진 주소(URL)", "image") + fld("사진 설명", "caption") + "</div>";
+      h += '<div class="row3">' +
+        fld("사진 옆으로 흐를 문단 수", "imgSide", { type: "number" }) +
+        fld("사진 폭 % (옆으로 흐를 때)", "imgW", { type: "number" }) +
+        fld("옆 글 단수", "ledeCols", { type: "number" }) +
+        "</div>";
       h += '<div class="row3">' +
         fld("사진 높이 px", "imgh", { type: "number" }) +
         fld("본문 단수", "cols", { type: "number" }) +

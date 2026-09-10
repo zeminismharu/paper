@@ -38,7 +38,10 @@
        "link": "https://gureumherald.com/article/42",
        "image": "https://res.cloudinary.com/df9wwuc7o/image/upload/v1788621016/rkrdrlp8cct1fpovgbzz.jpg",
        "caption": "사진 = 구름헤럴드",
-       "imgh": 128
+       "imgh": 160,
+       "imgSide": 2,
+       "imgW": 56,
+       "ledeCols": 1
       },
       {
        "type": "article",
@@ -114,7 +117,10 @@
        "link": "https://gureumherald.com/article/38",
        "image": "https://res.cloudinary.com/df9wwuc7o/image/upload/v1785070053/v1awmutkdi8sfqdnmgz3.jpg",
        "caption": "사진 = 구름헤럴드",
-       "imgh": 196
+       "imgh": 168,
+       "imgSide": 3,
+       "imgW": 46,
+       "ledeCols": 2
       },
       {
        "type": "article",

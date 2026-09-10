@@ -146,12 +146,14 @@ window.Paper = (function () {
         sub.map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
         "</div>";
     }
-    if (b.image) {
-      h += '<figure class="art__fig"><img src="' + esc(b.image) + '" alt=""' +
+    var paraList = paras(b.body);
+    var cols = Math.max(1, +b.cols || 1);
+    var figHTML = b.image
+      ? '<img src="' + esc(safeUrl(b.image)) + '" alt=""' +
         (b.imgh ? ' style="height:' + (+b.imgh) + 'px"' : "") + ">" +
-        (b.caption ? "<figcaption>" + esc(b.caption) + "</figcaption>" : "") +
-        "</figure>";
-    }
+        (b.caption ? "<figcaption>" + esc(b.caption) + "</figcaption>" : "")
+      : "";
+
     /* 본문 — 칸에 맞춰 줄인 글이라 잘리지 않습니다.
        verse 는 행을 나눠 쓴 글(시·수필). 들여쓰기 없이 줄을 그대로 살립니다.
 
@@ -160,12 +162,33 @@ window.Paper = (function () {
        첫 단 아래에서 다음 단 위로 이어지는 하나의 글이므로, 그 사이에 선을 그으면
        한 기사가 여러 토막으로 갈라져 보입니다. 기사끼리의 경계는 .blk 의
        왼쪽 테두리가 이미 맡고 있습니다. */
-    var cols = Math.max(1, +b.cols || 1);
-    h += '<div class="art__body' + (b.verse ? " art__body--verse" : "") +
-      '" style="column-count:' + cols +
-      ';column-gap:15px">' +
-      paras(b.body).map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
+    function bodyHTML(list) {
+      return '<div class="art__body' + (b.verse ? " art__body--verse" : "") +
+        '" style="column-count:' + cols + ';column-gap:15px">' +
+        list.map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
+        "</div>";
+    }
+
+    if (b.image && b.imgSide) {
+      /* 사진을 본문 중간에 놓고 글이 옆으로 흐릅니다.
+         imgSide 만큼의 문단이 사진 왼쪽 좁은 단으로 내려오고,
+         나머지 본문은 사진 아래에서 지면 폭 전체로 이어집니다.
+         (다단 안에서는 float 이 한 단에 갇히므로 격자로 나란히 놓습니다.) */
+      var n = Math.max(1, +b.imgSide);
+      var side = paraList.slice(0, n), rest = paraList.slice(n);
+      var w = Math.max(20, Math.min(80, +b.imgW || 54));
+      var lc = Math.max(1, +b.ledeCols || 2);
+      h += '<div class="art__lede" style="grid-template-columns:1fr ' + w + '%">' +
+        '<div class="art__lede-text" style="column-count:' + lc + '">' +
+          side.map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") +
+        "</div>" +
+        '<figure class="art__fig art__fig--side">' + figHTML + "</figure>" +
       "</div>";
+      h += bodyHTML(rest);
+    } else {
+      if (b.image) h += '<figure class="art__fig">' + figHTML + "</figure>";
+      h += bodyHTML(paraList);
+    }
 
     h += '<div class="art__foot">';
     if (b.byline) h += "<span>" + esc(b.byline) + "</span>";
@@ -341,7 +364,13 @@ window.Paper = (function () {
         (ri > 0 ? " row--rule" : "") + '">' + inner + "</div>";
     }).join("");
 
-    return '<div class="page"><div class="grid">' + body + "</div></div>";
+    /* 면 번호 — 신문은 어느 면에나 번호를 답니다 */
+    var foot = '<div class="pagefoot">' +
+      "<span>구름헤럴드</span>" +
+      "<span>" + esc(fmtDate(issue.date)) + "</span>" +
+      '<span class="pagefoot__no">' + esc(page.label || "") + "</span>" +
+      "</div>";
+    return '<div class="page"><div class="grid">' + body + "</div>" + foot + "</div>";
   }
 
   return {

@@ -32,7 +32,7 @@ LINK = "https://gureumherald.com/article/"
 
 def A(aid, head, kicker, byline, sub, body, span=4, size="minor",
       cols=1, image=None, boxed=False, verse=False, imgh=None, fill=False,
-      portrait=None):
+      portrait=None, imgSide=None, imgW=None, ledeCols=None):
     b = {
         "type": "article", "span": span, "size": size, "cols": cols,
         "kicker": kicker, "head": head, "byline": byline + " 기자",
@@ -43,6 +43,11 @@ def A(aid, head, kicker, byline, sub, body, span=4, size="minor",
         b["caption"] = "사진 = 구름헤럴드"
         if imgh:
             b["imgh"] = imgh
+        # imgSide = 사진 옆으로 흐를 문단 수. 사진이 본문 중간에 놓입니다.
+        if imgSide:
+            b["imgSide"] = imgSide
+            if imgW: b["imgW"] = imgW
+            if ledeCols: b["ledeCols"] = ledeCols
     if portrait:
         b["portrait"] = {"name": portrait}
     if boxed:
@@ -114,7 +119,8 @@ A1 = [
       "지하차도 안전시설과 백석2리 배수펌프장을 놓는다.\n\n"
       "생활 기반 시설에는 세대통합 복합지원센터 34억 원과 운정 행정복지센터 107억 원이 들어간다.",
       span=8, size="lead", cols=3,
-      image="v1788621016/rkrdrlp8cct1fpovgbzz.jpg", imgh=128),
+      image="v1788621016/rkrdrlp8cct1fpovgbzz.jpg", imgh=160,
+      imgSide=2, imgW=56, ledeCols=1),
 
     A(41, "‘GTX-A’ 타고 커지는 파주 운정", "사회", "황선준",
       "삼송·킨텍스·운정을 잇는 하나의 광역 벨트",
@@ -182,7 +188,8 @@ A2 = [
       "점을 들어 “상급심에서 파기환송되는 상황을 막기 위해 논리적 여지를 남겨둔 것”이라고 "
       "평가했다. 오 시장 측이 항소 뜻을 밝힘에 따라 법리 공방은 더 치열해질 전망이다.",
       span=12, size="major", cols=4,
-      image="v1785070053/v1awmutkdi8sfqdnmgz3.jpg", imgh=196),
+      image="v1785070053/v1awmutkdi8sfqdnmgz3.jpg", imgh=168,
+      imgSide=3, imgW=46, ledeCols=2),
 
     A(35, "유시민의 신(新)재건축론", "정치", "서정민",
       "“대통령 중심으로 당력 결집해야 정책 동력 확보”",

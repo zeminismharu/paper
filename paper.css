@@ -19,8 +19,13 @@
   --page-w: 1000px;
   --page-h: 1390px;
 
-  --serif: "Nanum Myeongjo", "Noto Serif KR", "Apple SD Gothic Neo", "Malgun Gothic", serif;
-  --sans:  "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  /* 신문은 서체를 세 갈래로 씁니다.
+     제호와 머릿기사 제목 / 나머지 기사 제목 / 본문.
+     하나로 통일하면 무엇이 중요한 기사인지 눈에 들어오지 않습니다. */
+  --display: "Hahmlet", "Noto Serif KR", "Nanum Myeongjo", serif;   /* 제호 · 머릿기사 */
+  --head:    "Noto Serif KR", "Nanum Myeongjo", serif;              /* 기사 제목 */
+  --serif:   "Nanum Myeongjo", "Noto Serif KR", "Apple SD Gothic Neo", serif;  /* 본문 */
+  --sans:    "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -131,7 +136,7 @@ html, body {
 .page {
   position: absolute;
   inset: 0;
-  padding: 26px 30px 24px;
+  padding: 26px 30px 40px;
   color: var(--ink);
   font-family: var(--serif);
   display: flex;
@@ -166,6 +171,16 @@ html, body {
 .blk.no-left { border-left: 0; padding-left: 0; }
 .blk.is-last-col { padding-right: 0; }
 
+/* 면 번호 — 신문은 어느 면에나 번호를 답니다 */
+.pagefoot {
+  position: absolute;
+  left: 30px; right: 30px; bottom: 12px;
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: var(--sans); font-size: 10px; color: var(--ink-soft);
+  border-top: 1px solid var(--hair); padding-top: 4px;
+}
+.pagefoot__no { font-weight: 800; letter-spacing: .06em; color: var(--ink); }
+
 /* ============================================================
    3. 제호(1면 머리)
    ============================================================ */
@@ -183,10 +198,11 @@ html, body {
   gap: 14px;
 }
 .masthead__title {
-  font-size: 62px;
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 60px;
   line-height: 1;
-  letter-spacing: .1em;
-  font-weight: 800;
+  letter-spacing: .08em;
   text-align: center;
   margin: 0;
   white-space: nowrap;
@@ -266,14 +282,22 @@ html, body {
   margin-bottom: 6px;
 }
 .art__title {
+  font-family: var(--head);
   margin: 0 0 8px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.24;
   letter-spacing: -.015em;
   word-break: keep-all;
 }
-.art--lead  .art__title { font-size: 38px; }
-.art--major .art__title { font-size: 26px; }
+/* 머릿기사만 제호와 같은 서체로 — 그 면에서 가장 중요한 기사임을 서체로 알립니다 */
+.art--lead  .art__title {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 37px;
+  line-height: 1.2;
+  letter-spacing: -.03em;
+}
+.art--major .art__title { font-size: 26px; font-weight: 900; }
 .art--minor .art__title { font-size: 19px; }
 .art--brief .art__title { font-size: 16px; }
 
@@ -292,6 +316,20 @@ html, body {
 .art__sub--list p::before { content: "· "; }
 
 .art__fig { margin: 0 0 9px; }
+
+/* 사진을 본문 중간에 놓고 글이 옆으로 흐르게 합니다.
+   왼쪽 좁은 단으로 글이 내려오다가, 사진 아래에서 본문 전체 폭으로 이어집니다.
+   (CSS 다단 안에서는 float 이 한 단에 갇히므로 격자로 나란히 놓습니다.) */
+.art__lede { display: grid; align-items: start; column-gap: 15px; margin-bottom: 4px; }
+.art__lede-text {
+  font-family: var(--serif);
+  font-size: 12.4px; line-height: 1.74;
+  text-align: justify; word-break: keep-all;
+  column-gap: 15px;
+}
+.art__lede-text p { margin: 0 0 .5em; text-indent: 1em; }
+.art__lede-text p:first-child { text-indent: 0; }
+.art__fig--side { margin: 0; }
 .art__fig img {
   width: 100%;
   display: block;
@@ -407,7 +445,7 @@ html, body {
 /* ── 표 · 그래프 ────────────────────────────────────────── */
 .tbl { font-family: var(--sans); display: flex; flex-direction: column; }
 .tbl__t {
-  font-family: var(--serif);
+  font-family: var(--head);
   font-size: 15px; font-weight: 800; letter-spacing: -.01em;
   margin-bottom: 4px; word-break: keep-all;
 }
@@ -468,7 +506,7 @@ html, body {
   color: var(--red); margin-bottom: 4px;
 }
 .quote__body {
-  font-family: var(--serif); font-size: 16px; line-height: 1.6;
+  font-family: var(--head); font-size: 16px; line-height: 1.6;
   font-weight: 700; word-break: keep-all;
 }
 .quote__body p { margin: 0 0 .4em; }
@@ -599,6 +637,7 @@ html, body {
   letter-spacing: .2em; color: var(--red); margin-bottom: 10px;
 }
 .reader__title {
+  font-family: var(--head);
   font-size: 30px; line-height: 1.3; margin: 0 0 12px;
   font-weight: 800; word-break: keep-all;
 }
