@@ -91,8 +91,12 @@ html, body {
   height: var(--page-h);
   transform-origin: left top;
   transform-style: preserve-3d;
-  will-change: transform;
 }
+/* will-change 는 넘기는 동안에만 켭니다.
+   늘 켜 두면 종이 여섯 면이 전부 그래픽 메모리에 상주해서,
+   휴대전화에서 창이 닫히는 원인이 됩니다. */
+.sheet.is-animating,
+.sheet.is-dragging { will-change: transform; }
 .sheet.is-animating { transition: transform .82s cubic-bezier(.22,.72,.24,1); }
 
 .face {

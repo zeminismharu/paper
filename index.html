@@ -276,6 +276,8 @@
       step = stepInfo(dir);
       if (!step) return;
       active = e.pointerId; startX = e.clientX; moved = 0;
+      // 끄는 동안에만 그래픽 메모리를 씁니다 (평소에 켜 두면 휴대전화가 버겁습니다)
+      if (step.kind === "flip" && sheets[step.sheet]) sheets[step.sheet].classList.add("is-dragging");
       handle.setPointerCapture(e.pointerId);
     });
 
@@ -298,6 +300,7 @@
       if (active !== e.pointerId) return;
       active = null;
       var st = step; step = null;
+      if (st && st.kind === "flip" && sheets[st.sheet]) sheets[st.sheet].classList.remove("is-dragging");
       if (!st) return;
 
       if (moved < 6) { animate(st); return; }   // 그냥 눌렀다 → 한 걸음

@@ -30,6 +30,25 @@ window.Paper = (function () {
     return /^(https?:\/\/|\/|\.\/|[\w.-]+\/)[^\s'"()<>\\]*$/i.test(u) ? u : "";
   }
 
+  /* 사진을 지면 크기에 맞춰 줄여서 불러옵니다.
+
+     원본 중에는 4000 x 3000 짜리(5MB)도 있습니다. 그런데 지면에서
+     사진이 차지하는 자리는 아무리 커야 560px 이고, 휴대전화에서는
+     지면 전체가 3분의 1로 줄어드니 200px 남짓입니다.
+     원본을 그대로 불러오면 사진 한 장을 펴 놓는 데만 48MB 가 듭니다.
+     여섯 장이면 100MB 가 넘고, 아이폰 사파리는 그쯤에서
+     "문제가 반복적으로 발생했습니다" 하며 창을 닫아 버립니다.
+
+     클라우디너리 주소에 f_auto,q_auto,w_ 를 끼워 넣으면 저쪽 서버가
+     알아서 줄이고 가벼운 형식으로 바꿔 보내 줍니다.
+     다른 곳의 사진 주소는 손대지 않고 그대로 둡니다. */
+  function sized(u, w) {
+    return String(u == null ? "" : u).replace(
+      /(\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(v\d+\/)/,
+      "$1f_auto,q_auto,w_" + w + "/$2"
+    );
+  }
+
   /* 빈 줄로 나뉜 덩어리를 문단으로 */
   function paras(text) {
     return String(text || "")
@@ -130,7 +149,7 @@ window.Paper = (function () {
       h += '<div class="art__head">' +
         '<div class="art__head-main">' + head + "</div>" +
         '<div class="art__portrait">' +
-          (pu ? '<img src="' + esc(pu) + '" alt="">'
+          (pu ? '<img src="' + esc(sized(pu, 240)) + '" alt="" decoding="async">'
               : '<div class="art__portrait-empty">필자<br>사진</div>') +
           '<div class="art__portrait-name">' + esc(b.portrait.name || "") + "</div>" +
         "</div></div>";
@@ -149,7 +168,7 @@ window.Paper = (function () {
     var paraList = paras(b.body);
     var cols = Math.max(1, +b.cols || 1);
     var figHTML = b.image
-      ? '<img src="' + esc(safeUrl(b.image)) + '" alt=""' +
+      ? '<img src="' + esc(sized(safeUrl(b.image), 1100)) + '" alt="" decoding="async"' +
         (b.imgh ? ' style="height:' + (+b.imgh) + 'px"' : "") + ">" +
         (b.caption ? "<figcaption>" + esc(b.caption) + "</figcaption>" : "")
       : "";
@@ -204,7 +223,7 @@ window.Paper = (function () {
 
     /* ① 사진 광고 — 만들어 둔 이미지를 그대로 붙입니다 */
     if (b.image) {
-      return '<div class="adslot filled" style="' + mh + '"><img src="' + esc(safeUrl(b.image)) +
+      return '<div class="adslot filled" style="' + mh + '"><img decoding="async" src="' + esc(sized(safeUrl(b.image), 1100)) +
         '" alt="' + esc(b.label || "광고") + '"></div>';
     }
 
@@ -212,7 +231,7 @@ window.Paper = (function () {
        한글이 또렷하게 나오고 어느 크기에서도 깨지지 않습니다.
        (AI 로 만든 그림에 한글을 넣으면 글자가 뭉개집니다) */
     if (b.adStyle === "text") {
-      var bgi = safeUrl(b.bgImage);
+      var bgi = sized(safeUrl(b.bgImage), 1400);
       var fg = b.fg || (bgi ? "#16130f" : "#ffffff");
       var ac = b.accent || (bgi ? "#9b1c1c" : "#ffd400");
       var pts = lines(b.points);
