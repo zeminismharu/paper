@@ -393,7 +393,7 @@ window.Paper = (function () {
   }
 
   return {
-    esc: esc, safeUrl: safeUrl, paras: paras, lines: lines, clone: clone,
+    esc: esc, safeUrl: safeUrl, sized: sized, paras: paras, lines: lines, clone: clone,
     fmtDate: fmtDate, fmtDateShort: fmtDateShort,
     load: load, readDraft: readDraft, writeDraft: writeDraft, clearDraft: clearDraft,
     renderPage: renderPage, place: place,

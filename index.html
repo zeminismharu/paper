@@ -348,7 +348,7 @@
         (b.byline ? "<span>" + Paper.esc(b.byline) + "</span>" : "") +
         "<span>" + Paper.esc(page.label || "") + "면</span>" +
       "</div>" +
-      (b.image ? '<img src="' + Paper.esc(b.image) + '" alt="">' : "") +
+      (b.image ? '<img src="' + Paper.esc(Paper.sized(b.image, 1100)) + '" alt="" decoding="async">' : "") +
       '<div class="reader__body' + (b.verse ? " reader__body--verse" : "") + '">' +
         Paper.paras(b.body).map(function (t) { return "<p>" + Paper.esc(t) + "</p>"; }).join("") +
       "</div>" +
