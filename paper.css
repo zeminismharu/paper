@@ -616,6 +616,23 @@ html, body {
   width: 100%;
 }
 
+/* 열람대 맨 아래에 이 지면의 주소를 작게 적어 둡니다.
+   화면을 찍어 보내거나 남에게 보여 줄 때, 어디서 본 것인지 남습니다. */
+.sitefoot {
+  width: 100%;
+  text-align: center;
+  margin-top: 2px;
+}
+.sitefoot a {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  color: rgba(233,229,220,.32);
+  text-decoration: none;
+}
+.sitefoot a:hover,
+.sitefoot a:focus-visible { color: rgba(233,229,220,.62); }
+
 /* ============================================================
    7. 기사 전문 읽기
    ============================================================ */

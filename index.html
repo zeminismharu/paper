@@ -38,6 +38,9 @@
     <a class="btn btn--ghost" href="admin.html">편집</a>
 
     <div class="hint" id="hint">종이의 오른쪽 끝을 잡아 끌면 넘어갑니다 · 기사를 누르면 크게 읽힙니다 · ← → 키</div>
+
+    <!-- 이 지면을 어디서 볼 수 있는지. 화면에 보이는 주소를 그대로 적습니다 -->
+    <div class="sitefoot"><a id="siteUrl" href="./">구름헤럴드 지면보기</a></div>
   </div>
 
 </div>
@@ -411,6 +414,16 @@
 
   // 인쇄가 끝나면 그릇을 비웁니다 (안 비우면 화면이 무거워집니다)
   window.addEventListener("afterprint", function () { printout.innerHTML = ""; });
+
+  /* 지금 보고 있는 주소를 그대로 적습니다.
+     나중에 우리 도메인으로 옮겨도 손댈 곳이 없습니다. */
+  (function showSiteUrl() {
+    var el = document.getElementById("siteUrl");
+    if (!el) return;
+    var path = location.pathname.replace(/index\.html$/, "").replace(/\/$/, "");
+    el.textContent = location.host + path;
+    el.href = path + "/";
+  })();
 
   function buildDates() {
     dateSel.innerHTML = "";
