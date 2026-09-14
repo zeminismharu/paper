@@ -9,6 +9,10 @@ window.Paper = (function () {
   "use strict";
 
   var DRAFT_KEY = "gureumherald.paper.draft.v1";
+
+  /* 지면보기 주소. 자료(meta.paperSite)에서 받아 둡니다.
+     지면 아래 큐알이 가리키는 곳과 그 옆에 적히는 글자가 같아야 합니다. */
+  var PAPER_SITE = "";
   var DATA_URL = "data/paper.json";
 
   /* ---------- 글자 안전 처리 ----------
@@ -101,15 +105,25 @@ window.Paper = (function () {
      ① data/paper.json (저장소에 올린 최종본)
      ② 없으면 seed.js 에 들어 있는 처음 자료
      파일을 그냥 더블클릭해서 열면 ①은 브라우저가 막으므로 ②로 갑니다. */
+  function keepMeta(d) {
+    if (d && d.meta && d.meta.paperSite) PAPER_SITE = String(d.meta.paperSite);
+  }
+
+  /* 주소를 사람이 읽기 좋게 — https:// 와 끝의 빗금을 뗍니다 */
+  function siteLabel() {
+    return PAPER_SITE.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  }
+
   function load(opts) {
     opts = opts || {};
     if (opts.draft) {
       var d = readDraft();
-      if (d) return Promise.resolve(d);
+      if (d) { keepMeta(d); return Promise.resolve(d); }
     }
     return fetch(DATA_URL, { cache: "no-store" })
       .then(function (r) { if (!r.ok) throw new Error("no file"); return r.json(); })
-      .catch(function () { return clone(window.PAPER_SEED); });
+      .catch(function () { return clone(window.PAPER_SEED); })
+      .then(function (d) { keepMeta(d); return d; });
   }
 
   /* ---------- 지면 그리기 ---------- */
@@ -392,7 +406,7 @@ window.Paper = (function () {
         '<img class="pagefoot__qr" src="images/qr-paper.svg" alt="">' +
         '<span class="pagefoot__id">' +
           "<b>구름헤럴드</b>" +
-          "<i>zeminismharu.github.io/paper</i>" +
+          "<i>" + esc(siteLabel()) + "</i>" +
         "</span>" +
       "</span>" +
       "<span>" + esc(fmtDate(issue.date)) + "</span>" +

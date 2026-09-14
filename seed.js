@@ -3,7 +3,8 @@ window.PAPER_SEED = {
  "meta": {
   "name": "구름헤럴드",
   "tagline": "구름 위에서 본 세상, 맑은 시각으로 전하는 뉴스",
-  "site": "https://gureumherald.com/"
+  "site": "https://gureumherald.com/",
+  "paperSite": "https://zeminismharu.github.io/paper/"
  },
  "issues": [
   {

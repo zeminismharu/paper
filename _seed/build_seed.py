@@ -29,6 +29,75 @@ ROOT = os.path.dirname(HERE)
 IMG = "https://res.cloudinary.com/df9wwuc7o/image/upload/"
 LINK = "https://gureumherald.com/article/"
 
+# ══════════════════════════════════════════════════════════════
+#  지면보기 주소 — 고칠 곳은 여기 한 줄뿐입니다
+# ══════════════════════════════════════════════════════════════
+#  나중에 우리 도메인으로 옮기시면 이 줄만 바꾸고 다시 돌리세요.
+#      python3 _seed/build_seed.py
+#  그러면 지면 아래 큐알과 그 옆 주소가 함께 바뀝니다.
+#  끝의 빗금(/)까지 적어 주세요.
+PAPER_SITE = "https://zeminismharu.github.io/paper/"
+
+QR_PATH = os.path.join(ROOT, "images", "qr-paper.svg")
+
+
+def make_qr(url, path):
+    """지면 아래 큐알을 다시 그립니다.
+
+    선으로 그린 그림(SVG)이라 크게 뽑아도 흐려지지 않습니다.
+    둘레의 흰 여백은 CSS 가 줍니다(.pagefoot__qr 의 padding).
+    어두운 테두리를 두르면 읽히지 않으니 두르지 마세요.
+    """
+    mark = "<!--addr:" + url + "-->"
+    if os.path.exists(path):
+        with io.open(path, encoding="utf-8") as f:
+            if mark in f.read():
+                return  # 이미 같은 주소입니다
+    try:
+        import qrcode
+    except ImportError:
+        print("  ! 큐알을 다시 그리지 못했습니다 — qrcode 꾸러미가 없습니다.")
+        print("    pip install qrcode  를 한 번 하신 뒤 다시 돌려 주세요.")
+        if os.path.exists(path):
+            print("    (지금 있는 큐알은 그대로 둡니다. 주소가 다를 수 있습니다)")
+        else:
+            print("    ※ 큐알 파일이 아예 없어 지면에 빈 칸으로 나옵니다.")
+        return
+
+    q = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, border=0)
+    q.add_data(url)
+    q.make(fit=True)
+    m = q.get_matrix()
+    n = len(m)
+    d = []
+    for y, row in enumerate(m):
+        x = 0
+        while x < n:
+            if row[x]:
+                x0 = x
+                while x < n and row[x]:
+                    x += 1
+                d.append("M%d %dh%dv1h%dz" % (x0, y, x - x0, -(x - x0)))
+            else:
+                x += 1
+    svg = (
+        mark
+        + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" ' % (n, n)
+        + 'shape-rendering="crispEdges" role="img" '
+        + 'aria-label="구름헤럴드 지면보기 주소">'
+        + '<rect width="%d" height="%d" fill="#ffffff"/>' % (n, n)
+        + '<path fill="#16130f" d="%s"/></svg>' % "".join(d)
+    )
+    with io.open(path, "w", encoding="utf-8") as f:
+        f.write(svg)
+    # A4 로 뽑았을 때 칸 하나의 크기 — 0.4mm 아래로 내려가면 못 읽습니다.
+    #   지면에서 큐알 상자는 70px, 둘레 흰 여백이 5px 씩이라 그림은 60px.
+    #   1px = 0.2646mm, A4 로 줄이면 0.7937 배.
+    mm = 60 * 0.2646 * 0.7937 / n
+    print("  큐알 다시 그림 — %d칸, A4 에서 칸 하나 %.2fmm  (%s)" % (n, mm, url))
+    if mm < 0.40:
+        print("  ! 칸이 너무 작습니다. 주소를 줄이거나 큐알을 키우세요.")
+
 
 def A(aid, head, kicker, byline, sub, body, span=4, size="minor",
       cols=1, image=None, boxed=False, verse=False, imgh=None, fill=False,
@@ -487,6 +556,8 @@ data = {
         "name": "구름헤럴드",
         "tagline": "구름 위에서 본 세상, 맑은 시각으로 전하는 뉴스",
         "site": "https://gureumherald.com/",
+        # 지면 아래 큐알과 그 옆에 적히는 주소. 고칠 곳은 맨 위 PAPER_SITE 한 줄입니다.
+        "paperSite": PAPER_SITE,
     },
     "issues": [
         {
@@ -504,6 +575,8 @@ data = {
         }
     ],
 }
+
+make_qr(PAPER_SITE, QR_PATH)
 
 out = os.path.join(ROOT, "seed.js")
 with io.open(out, "w", encoding="utf-8") as f:
