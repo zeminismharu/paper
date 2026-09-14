@@ -7,7 +7,7 @@ window.PAPER_SEED = {
  },
  "issues": [
   {
-   "date": "2026-09-05",
+   "date": "2026-09-10",
    "volume": "제 1 호",
    "pages": [
     {
@@ -67,7 +67,7 @@ window.PAPER_SEED = {
        "subtitle": "",
        "body": "학교 내 편의시설 등 많은 발전에 비해 그 외부는 전통을 이어간다. 나는 가끔 중부대가 외딴 섬처럼 느껴질 때가 있다.",
        "image": "images/photos/jungbu-busstop.webp",
-       "caption": "중부대학교 초입. 사진 = 류제민 기자"
+       "caption": "9일 경기 고양시 중부대학교 초입의 버스정류장. 학교 안에 편의시설이 느는 동안, 노선안내도에 붙은 버스는 85번과 055번 둘이다. 사진 = 류제민 기자"
       },
       {
        "type": "article",
