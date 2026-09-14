@@ -384,8 +384,17 @@ window.Paper = (function () {
     }).join("");
 
     /* 면 번호 — 신문은 어느 면에나 번호를 답니다 */
+    /* 지면 왼쪽 아래 모서리에 이 지면을 볼 수 있는 주소를 남깁니다.
+       종이로 뽑아 돌려 보는 사람이 휴대전화로 찍으면 바로 열립니다.
+       그림이 아니라 선으로 그린 그림(SVG)이라 크게 뽑아도 흐려지지 않습니다. */
     var foot = '<div class="pagefoot">' +
-      "<span>구름헤럴드</span>" +
+      '<span class="pagefoot__mark">' +
+        '<img class="pagefoot__qr" src="images/qr-paper.svg" alt="">' +
+        '<span class="pagefoot__id">' +
+          "<b>구름헤럴드</b>" +
+          "<i>zeminismharu.github.io/paper</i>" +
+        "</span>" +
+      "</span>" +
       "<span>" + esc(fmtDate(issue.date)) + "</span>" +
       '<span class="pagefoot__no">' + esc(page.label || "") + "</span>" +
       "</div>";

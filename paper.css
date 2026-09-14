@@ -147,7 +147,7 @@ html, body {
 .page {
   position: absolute;
   inset: 0;
-  padding: 26px 30px 40px;
+  padding: 26px 30px 82px;
   color: var(--ink);
   font-family: var(--serif);
   display: flex;
@@ -185,12 +185,25 @@ html, body {
 /* 면 번호 — 신문은 어느 면에나 번호를 답니다 */
 .pagefoot {
   position: absolute;
-  left: 30px; right: 30px; bottom: 12px;
-  display: flex; justify-content: space-between; align-items: baseline;
+  left: 30px; right: 30px; bottom: 4px;
+  display: flex; justify-content: space-between; align-items: flex-end;
   font-family: var(--sans); font-size: 10px; color: var(--ink-soft);
-  border-top: 1px solid var(--hair); padding-top: 4px;
+  border-top: 1px solid var(--hair); padding-top: 6px;
 }
 .pagefoot__no { font-weight: 800; letter-spacing: .06em; color: var(--ink); }
+
+/* 왼쪽 모서리 — 큐알과 제호 */
+.pagefoot__mark { display: flex; align-items: flex-end; gap: 8px; }
+.pagefoot__qr {
+  width: 70px; height: 70px;
+  display: block;
+  box-sizing: border-box;
+  padding: 5px;                  /* 큐알 둘레의 흰 여백. 이게 없으면 안 읽힙니다 */
+  background: #fff;              /* 종이색 위에서도 흰 바탕이 있어야 읽힙니다 */
+}
+.pagefoot__id { display: flex; flex-direction: column; gap: 2px; }
+.pagefoot__id b { font-weight: 700; color: var(--ink); letter-spacing: .02em; }
+.pagefoot__id i { font-style: normal; font-size: 9px; color: var(--ad); letter-spacing: .01em; }
 
 /* ============================================================
    3. 제호(1면 머리)
